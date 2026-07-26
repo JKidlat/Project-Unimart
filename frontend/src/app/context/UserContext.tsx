@@ -32,6 +32,9 @@ interface UserProfile {
   profilePic: string | null;
   joinDate: string;
   referralCode: string;
+  ordersCount: number;
+  wishlistCount: number;
+  referralsCount: number;
 }
 
 /**
@@ -95,7 +98,10 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
               role: data.is_vendor ? 'Seller' : 'Buyer',
               profilePic: null,
               joinDate: 'Just now',
-              referralCode: `UNIM-${data.id || 'NEW'}`,
+              referralCode: data.referral_code || `UNIM-${data.id || 'NEW'}`,
+              ordersCount: data.orders_count || 0,
+              wishlistCount: data.wishlist_count || 0,
+              referralsCount: data.referrals_count || 0,
             });
             setIsLoggedIn(true);
           } else {

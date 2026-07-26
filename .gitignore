@@ -27,3 +27,7 @@ ENV/
 # Node
 node_modules/
 frontend/node_modules/
+
+# Firebase / Credentials
+firebase-credentials.json
+

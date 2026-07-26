@@ -8,6 +8,11 @@ Each user has an associated Profile linked to a university.
 from django.db import models
 from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin, BaseUserManager
 from universities.models import University
+import uuid
+
+def generate_referral_code():
+    """Generates a random 8-character referral code."""
+    return str(uuid.uuid4())[:8].upper()
 
 
 class UserManager(BaseUserManager):
@@ -90,6 +95,16 @@ class Profile(models.Model):
     is_vendor = models.BooleanField(
         default=False,
         help_text="Whether the user can sell products in the marketplace."
+    )
+    referral_code = models.CharField(
+        max_length=20,
+        unique=True,
+        default=generate_referral_code,
+        help_text="Unique referral code for the user."
+    )
+    referrals_count = models.IntegerField(
+        default=0,
+        help_text="Number of successful referrals made by the user."
     )
 
     def __str__(self):

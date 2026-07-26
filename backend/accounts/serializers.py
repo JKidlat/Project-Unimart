@@ -10,10 +10,23 @@ User = get_user_model()
 class UserProfileSerializer(serializers.ModelSerializer):
     university_name = serializers.CharField(source='profile.university.name', read_only=True)
     is_vendor = serializers.BooleanField(source='profile.is_vendor', read_only=True)
+    referral_code = serializers.CharField(source='profile.referral_code', read_only=True)
+    referrals_count = serializers.IntegerField(source='profile.referrals_count', read_only=True)
+    orders_count = serializers.SerializerMethodField()
+    wishlist_count = serializers.SerializerMethodField()
     
     class Meta:
         model = User
-        fields = ['id', 'email', 'phone_number', 'is_active', 'is_staff', 'is_verified_student', 'university_name', 'is_vendor']
+        fields = [
+            'id', 'email', 'phone_number', 'is_active', 'is_staff', 'is_verified_student', 
+            'university_name', 'is_vendor', 'referral_code', 'referrals_count', 'orders_count', 'wishlist_count'
+        ]
+
+    def get_orders_count(self, obj):
+        return obj.orders_made.count()
+
+    def get_wishlist_count(self, obj):
+        return 0  # Default to 0 until wishlist backend is implemented
 
 class RegisterSerializer(serializers.ModelSerializer):
     """

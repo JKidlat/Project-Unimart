@@ -11,7 +11,12 @@ User = get_user_model()
 # For now, we will initialize it here safely.
 if not firebase_admin._apps:
     try:
-        firebase_admin.initialize_app(options={'projectId': 'unimart-c4308'})
+        cred_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'firebase-credentials.json')
+        if os.path.exists(cred_path):
+            cred = credentials.Certificate(cred_path)
+            firebase_admin.initialize_app(cred, options={'projectId': 'unimart-c4308'})
+        else:
+            firebase_admin.initialize_app(options={'projectId': 'unimart-c4308'})
     except Exception as e:
         print("Warning: Firebase Admin SDK not properly initialized. Error:", e)
 
@@ -41,14 +46,17 @@ class FirebaseAuthentication(authentication.BaseAuthentication):
             uid = decoded_token.get("uid")
             email = decoded_token.get("email")
         except Exception as e:
+            print(f"FIREBASE AUTH EXCEPTION: {str(e)}")
             raise exceptions.AuthenticationFailed(f"Firebase auth error: {str(e)}")
             
         if not uid or not email:
+            print("FIREBASE AUTH: Missing UID or Email")
             raise exceptions.AuthenticationFailed("Firebase token missing UID or email.")
             
         try:
             user = User.objects.get(email=email)
         except User.DoesNotExist:
+            print(f"FIREBASE AUTH: User {email} not found in database")
             raise exceptions.AuthenticationFailed("User not found in our database. Please register first.")
             
         return (user, None)
