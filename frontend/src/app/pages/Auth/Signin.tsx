@@ -1,43 +1,42 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { motion } from 'motion/react';
-import { ShieldCheck, Mail, Lock, ChevronRight, Grapes } from 'lucide-react';
+import { ShieldCheck, Mail, Lock, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
-import { signInWithEmailAndPassword } from 'firebase/auth';
-import { auth } from '../../../lib/firebase';
+import { useUser } from '../../context/UserContext';
 
 export const Signin = () => {
   const navigate = useNavigate();
+  const { login } = useUser();
   const [formData, setFormData] = useState({
     email: '',
     password: '',
   });
-  const [isLoading, setIsLoading] = useState(false);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
-    
-    try {
-      await signInWithEmailAndPassword(auth, formData.email, formData.password);
-      toast.success("Welcome back to Unimart!");
-      navigate('/');
-    } catch (error: any) {
-      console.error('Sign in error:', error);
-      toast.error(error.message || "Invalid email or password.");
-    } finally {
-      setIsLoading(false);
-    }
+    // Simulate a successful sign-in with a placeholder profile until real backend is wired
+    login({
+      name: "Emmanuel Boateng",
+      email: formData.email,
+      university: "University of Ghana (UG)",
+      role: "Buyer",
+      profilePic: null,
+      joinDate: "Sept 2024",
+      referralCode: "UNIM-EB-2026",
+    });
+    toast.success("Welcome back to Unimart!");
+    navigate('/');
   };
 
   return (
     <div className="min-h-screen pt-20 pb-12 flex flex-col items-center justify-center px-4 bg-gradient-to-br from-[#fcf6f7] to-white">
-      <motion.div 
+      <motion.div
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
         className="max-w-md w-full bg-white rounded-[2.5rem] shadow-2xl shadow-[#a14b581a] border border-[#f3d7db] p-8 md:p-12"
@@ -81,7 +80,7 @@ export const Signin = () => {
           <div className="space-y-2">
             <div className="flex justify-between">
               <label className="text-sm font-bold text-gray-700">Password</label>
-              <Link to="/forgot-password" weights="bold" className="text-xs text-[#a14b58] font-bold">Forgot password?</Link>
+              <Link to="/forgot-password" className="text-xs text-[#a14b58] font-bold">Forgot password?</Link>
             </div>
             <div className="relative">
               <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
@@ -98,11 +97,10 @@ export const Signin = () => {
 
           <button
             type="submit"
-            disabled={isLoading}
-            className="w-full bg-[#a14b58] text-white py-4 rounded-2xl font-bold text-lg hover:bg-[#863b48] transition-all shadow-xl shadow-[#a14b584d] flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
+            className="w-full bg-[#a14b58] text-white py-4 rounded-2xl font-bold text-lg hover:bg-[#863b48] transition-all shadow-xl shadow-[#a14b584d] flex items-center justify-center gap-2"
           >
-            {isLoading ? "Signing In..." : "Sign In"}
-            {!isLoading && <ChevronRight className="w-5 h-5" />}
+            Sign In
+            <ChevronRight className="w-5 h-5" />
           </button>
         </form>
 

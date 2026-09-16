@@ -53,10 +53,11 @@ class FirebaseAuthentication(authentication.BaseAuthentication):
             print("FIREBASE AUTH: Missing UID or Email")
             raise exceptions.AuthenticationFailed("Firebase token missing UID or email.")
             
-        try:
-            user = User.objects.get(email=email)
-        except User.DoesNotExist:
-            print(f"FIREBASE AUTH: User {email} not found in database")
-            raise exceptions.AuthenticationFailed("User not found in our database. Please register first.")
+        from accounts.models import Profile
+        user, created = User.objects.get_or_create(email=email)
+        if created:
+            user.set_unusable_password()
+            user.save()
+            Profile.objects.create(user=user)
             
         return (user, None)

@@ -1,20 +1,21 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { motion } from 'motion/react';
-import { ShieldCheck, Mail, Lock, User, Phone, GraduationCap, Briefcase, ChevronRight } from 'lucide-react';
+import { ShieldCheck, Mail, Lock, User, Phone, GraduationCap, Briefcase, ChevronRight, CheckCircle2 } from 'lucide-react';
+import { universities } from '../../data/mockData';
 import { toast } from 'sonner';
-import { createUserWithEmailAndPassword } from 'firebase/auth';
-import { auth } from '../../../lib/firebase';
+import { useUser } from '../../context/UserContext';
+import type { UserRole } from '../../context/UserContext';
 
 export const Signup = () => {
   const navigate = useNavigate();
-  const [isLoading, setIsLoading] = useState(false);
-  const [universities, setUniversities] = useState<{id: number, name: string}[]>([]);
+  const { login } = useUser();
+  const [step, setStep] = useState(1);
   const [formData, setFormData] = useState({
     fullName: '',
     username: '',
     email: '',
-    universityId: '',
+    university: '',
     password: '',
     confirmPassword: '',
     role: 'Buyer',
@@ -23,73 +24,35 @@ export const Signup = () => {
     agreeTerms: false
   });
 
-  useEffect(() => {
-    fetch('http://127.0.0.1:8000/api/universities/')
-      .then(res => res.json())
-      .then(data => setUniversities(data))
-      .catch(err => console.error('Failed to fetch universities:', err));
-  }, []);
-
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target;
     const val = type === 'checkbox' ? (e.target as HTMLInputElement).checked : value;
     setFormData(prev => ({ ...prev, [name]: val }));
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
     if (formData.password !== formData.confirmPassword) {
-      toast.error("Passwords do not match!");
+      toast.error("Passwords do not match");
       return;
     }
-
-    if (!formData.universityId) {
-      toast.error("Please select your university.");
+    if (!formData.agreeTerms) {
+      toast.error("Please agree to terms and conditions");
       return;
     }
-
-    setIsLoading(true);
-
-    try {
-      // 1. Create User in Firebase
-      const userCredential = await createUserWithEmailAndPassword(auth, formData.email, formData.password);
-      const firebaseUser = userCredential.user;
-      
-      // 2. Get the Firebase ID Token
-      const token = await firebaseUser.getIdToken();
-
-      // 3. Create the user profile in Django
-      const response = await fetch('http://127.0.0.1:8000/api/auth/register/', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          firebase_token: token,
-          university_id: parseInt(formData.universityId),
-          is_vendor: formData.role === 'Seller'
-        }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        console.error("Backend returned 400 with data:", errorData);
-        throw new Error(errorData.email?.[0] || errorData.firebase_token?.[0] || errorData.non_field_errors?.[0] || `Server Error: ${JSON.stringify(errorData)}`);
-      }
-
-      // Firebase automatically signs the user in upon creation.
-      // We sign them out so they are forced to log in manually as requested.
-      await auth.signOut();
-
-      toast.success("Account created successfully! Please sign in.");
-      navigate('/signin');
-    } catch (error: any) {
-      console.error('Registration error:', error);
-      toast.error(error.message || "Failed to create account. Please try again.");
-    } finally {
-      setIsLoading(false);
-    }
+    
+    const initials = formData.fullName.split(' ').map((w: string) => w[0]).filter(Boolean).join('').toUpperCase();
+    login({
+      name: formData.fullName,
+      email: formData.email,
+      university: formData.university,
+      role: formData.role as UserRole,
+      profilePic: null,
+      joinDate: new Date().toLocaleDateString('en-GB', { month: 'short', year: 'numeric' }),
+      referralCode: `UNIM-${initials}-${Date.now().toString().slice(-4)}`,
+    });
+    toast.success("Account created successfully! Please verify your email.");
+    navigate('/profile');
   };
 
   return (
@@ -159,13 +122,13 @@ export const Signup = () => {
             <div className="relative">
               <GraduationCap className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
               <select
-                name="universityId"
+                name="university"
                 required
                 className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-[#f3d7db] rounded-xl focus:ring-2 focus:ring-[#a14b58] focus:outline-none appearance-none"
                 onChange={handleInputChange}
               >
                 <option value="">Select your institution</option>
-                {universities.map(uni => <option key={uni.id} value={uni.id}>{uni.name}</option>)}
+                {universities.map(uni => <option key={uni} value={uni}>{uni}</option>)}
               </select>
             </div>
           </div>

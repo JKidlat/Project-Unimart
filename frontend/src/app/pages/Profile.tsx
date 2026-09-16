@@ -32,9 +32,9 @@ export const Profile = () => {
   };
 
   const menuItems = [
-    { icon: ShoppingBag, label: 'Order History', count: user.ordersCount, path: '/orders' },
-    { icon: Heart, label: 'Wishlist', count: user.wishlistCount, path: '/wishlist' },
-    { icon: Users, label: 'My Referrals', count: user.referralsCount, path: '/referrals' },
+    { icon: ShoppingBag, label: 'Order History', count: 12, path: '/orders' },
+    { icon: Heart, label: 'Wishlist', count: 8, path: '/wishlist' },
+    { icon: Users, label: 'My Referrals', count: 5, path: '/referrals' },
     { icon: Settings, label: 'Account Settings', path: '/settings' },
     { icon: ShieldCheck, label: 'Verification Center', path: '/verification' },
   ];
@@ -83,15 +83,15 @@ export const Profile = () => {
 
           <div className="grid grid-cols-3 gap-4 mb-10">
             <div className="bg-gray-50 rounded-2xl p-4 text-center border border-gray-100">
-              <p className="text-2xl font-black text-gray-900">{user.ordersCount}</p>
+              <p className="text-2xl font-black text-gray-900">12</p>
               <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Orders</p>
             </div>
             <div className="bg-gray-50 rounded-2xl p-4 text-center border border-gray-100">
-              <p className="text-2xl font-black text-gray-900">{user.wishlistCount}</p>
+              <p className="text-2xl font-black text-gray-900">8</p>
               <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Wishlist</p>
             </div>
             <div className="bg-gray-50 rounded-2xl p-4 text-center border border-gray-100">
-              <p className="text-2xl font-black text-gray-900">{user.referralsCount}</p>
+              <p className="text-2xl font-black text-gray-900">5</p>
               <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Referrals</p>
             </div>
           </div>

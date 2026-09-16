@@ -1,7 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import { onAuthStateChanged, signOut } from 'firebase/auth';
-import { auth } from '../../lib/firebase';
-import { toast } from 'sonner';
+import React, { createContext, useContext, useState } from 'react';
 
 /**
  * UserRole Type
@@ -24,7 +21,7 @@ interface NotificationSettings {
  * UserProfile Interface
  * Represents the comprehensive data structure for a logged-in user.
  */
-interface UserProfile {
+export interface UserProfile {
   name: string;
   email: string;
   university: string;
@@ -32,9 +29,6 @@ interface UserProfile {
   profilePic: string | null;
   joinDate: string;
   referralCode: string;
-  ordersCount: number;
-  wishlistCount: number;
-  referralsCount: number;
 }
 
 /**
@@ -45,6 +39,7 @@ interface UserContextType {
   user: UserProfile | null;
   searchQuery: string;
   setSearchQuery: (query: string) => void;
+  login: (profile: UserProfile) => void;
   updateProfile: (updates: Partial<UserProfile>) => void;
   logout: () => void;
   notificationSettings: NotificationSettings;
@@ -56,19 +51,24 @@ const UserContext = createContext<UserContextType | undefined>(undefined);
 
 /**
  * UserProvider Component
- * 
+ *
  * The context provider that wraps the application. It manages:
  * - Current user session and profile data
  * - Global search state used by the marketplace
  * - Notification preferences
- * - Authentication state (mocked)
+ * - Authentication state
  */
 export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  // Global search query state shared between Navbar and Shop pages
   const [searchQuery, setSearchQuery] = useState('');
-  const [isLoggedIn, setIsLoggedIn] = useState(false); 
-  const [user, setUser] = useState<UserProfile | null>(null);
-  const [loading, setLoading] = useState(true);
 
+  // Auth state — starts logged out so Sign In is shown to new visitors
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+
+  // Current user profile state — null until the user signs in or signs up
+  const [user, setUser] = useState<UserProfile | null>(null);
+
+  // User notification preferences
   const [notificationSettings, setNotificationSettings] = useState<NotificationSettings>({
     chat: true,
     orders: true,
@@ -76,59 +76,17 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
     promotions: true,
   });
 
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      if (firebaseUser) {
-        try {
-          const token = await firebaseUser.getIdToken();
-          
-          // Fetch profile from Django
-          const response = await fetch('http://127.0.0.1:8000/api/auth/me/', {
-            headers: {
-              'Authorization': `Bearer ${token}`
-            }
-          });
-          
-          if (response.ok) {
-            const data = await response.json();
-            setUser({
-              name: data.email.split('@')[0],
-              email: data.email,
-              university: data.university_name || 'Unknown University',
-              role: data.is_vendor ? 'Seller' : 'Buyer',
-              profilePic: null,
-              joinDate: 'Just now',
-              referralCode: data.referral_code || `UNIM-${data.id || 'NEW'}`,
-              ordersCount: data.orders_count || 0,
-              wishlistCount: data.wishlist_count || 0,
-              referralsCount: data.referrals_count || 0,
-            });
-            setIsLoggedIn(true);
-          } else {
-            const errorText = await response.text();
-            console.error('Failed to fetch profile from Django:', response.status, errorText);
-            toast.error(`Backend Login Error: ${response.status} - ${errorText.substring(0, 50)}`);
-            setIsLoggedIn(false);
-            setUser(null);
-          }
-        } catch (error: any) {
-          console.error('Error fetching profile:', error);
-          toast.error(`Network Error: ${error.message}`);
-          setIsLoggedIn(false);
-          setUser(null);
-        }
-      } else {
-        setIsLoggedIn(false);
-        setUser(null);
-      }
-      setLoading(false);
-    });
-
-    return () => unsubscribe();
-  }, []);
+  /**
+   * Sets the active user session after a successful sign-in or sign-up.
+   * @param profile - Full user profile to store in context
+   */
+  const login = (profile: UserProfile) => {
+    setUser(profile);
+    setIsLoggedIn(true);
+  };
 
   /**
-   * Updates the user profile with new partial data
+   * Updates the user profile with new partial data.
    * @param updates - Object containing properties to update
    */
   const updateProfile = (updates: Partial<UserProfile>) => {
@@ -136,7 +94,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   /**
-   * Updates notification preferences
+   * Updates notification preferences.
    * @param updates - Object containing notification flags to update
    */
   const updateNotificationSettings = (updates: Partial<NotificationSettings>) => {
@@ -144,30 +102,24 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   /**
-   * Handles user logout
-   * Resets local state and redirects to the sign-in page
+   * Handles user logout.
+   * Resets local state and redirects to the sign-in page.
    */
-  const logout = async () => {
-    try {
-      await signOut(auth);
-      window.location.href = '/signin';
-    } catch (error) {
-      console.error('Logout error:', error);
-    }
+  const logout = () => {
+    setIsLoggedIn(false);
+    setUser(null);
+    window.location.href = '/signin';
   };
 
-  if (loading) {
-    return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
-  }
-
   return (
-    <UserContext.Provider value={{ 
-      user, 
-      searchQuery, 
-      setSearchQuery, 
-      updateProfile, 
-      logout, 
-      notificationSettings, 
+    <UserContext.Provider value={{
+      user,
+      searchQuery,
+      setSearchQuery,
+      login,
+      updateProfile,
+      logout,
+      notificationSettings,
       updateNotificationSettings,
       isLoggedIn
     }}>
@@ -178,8 +130,8 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
 /**
  * useUser Hook
- * 
- * Custom hook to access the UserContext. 
+ *
+ * Custom hook to access the UserContext.
  * Must be used within a UserProvider component.
  */
 export const useUser = () => {
