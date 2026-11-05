@@ -3,82 +3,126 @@ from django.contrib.auth import get_user_model
 from django.db import transaction
 from .models import Profile
 from universities.models import University
-import firebase_admin.auth as auth
 
 User = get_user_model()
 
 class UserProfileSerializer(serializers.ModelSerializer):
-    university_name = serializers.CharField(source='profile.university.name', read_only=True)
-    is_vendor = serializers.BooleanField(source='profile.is_vendor', read_only=True)
-    referral_code = serializers.CharField(source='profile.referral_code', read_only=True)
-    referrals_count = serializers.IntegerField(source='profile.referrals_count', read_only=True)
+    university_name = serializers.CharField(source='profile.university.name', read_only=True, default='')
+    university_id = serializers.IntegerField(source='profile.university.id', read_only=True, default=None)
+    is_vendor = serializers.BooleanField(source='profile.is_vendor', read_only=True, default=False)
+    profile_pic = serializers.CharField(source='profile.profile_pic', read_only=True, default=None)
+    referral_code = serializers.CharField(source='profile.referral_code', read_only=True, default='')
+    referrals_count = serializers.IntegerField(source='profile.referrals_count', read_only=True, default=0)
+    role = serializers.SerializerMethodField()
     orders_count = serializers.SerializerMethodField()
     wishlist_count = serializers.SerializerMethodField()
     
     class Meta:
         model = User
         fields = [
-            'id', 'email', 'phone_number', 'is_active', 'is_staff', 'is_verified_student', 
-            'university_name', 'is_vendor', 'referral_code', 'referrals_count', 'orders_count', 'wishlist_count'
+            'id', 'email', 'full_name', 'phone_number', 'is_active', 'is_staff', 
+            'is_verified_student', 'university_id', 'university_name', 'is_vendor', 
+            'role', 'profile_pic', 'referral_code', 'referrals_count', 'orders_count', 'wishlist_count'
         ]
 
+    def get_role(self, obj):
+        if obj.is_staff or obj.is_superuser:
+            return 'Admin'
+        try:
+            return 'Seller' if obj.profile.is_vendor else 'Buyer'
+        except Exception:
+            return 'Buyer'
+
     def get_orders_count(self, obj):
-        return obj.orders_made.count()
+        try:
+            return obj.orders_made.count()
+        except Exception:
+            return 0
 
     def get_wishlist_count(self, obj):
-        return 0  # Default to 0 until wishlist backend is implemented
+        return 0
 
-class RegisterSerializer(serializers.ModelSerializer):
+
+class ProfileUpdateSerializer(serializers.Serializer):
+    full_name = serializers.CharField(required=False, allow_blank=True)
+    phone_number = serializers.CharField(required=False, allow_blank=True)
+    university_id = serializers.IntegerField(required=False, allow_null=True)
+    is_vendor = serializers.BooleanField(required=False)
+    role = serializers.CharField(required=False)
+    profile_pic = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+
+    def update(self, instance, validated_data):
+        user = instance
+        if 'full_name' in validated_data:
+            user.full_name = validated_data['full_name']
+        if 'phone_number' in validated_data:
+            user.phone_number = validated_data['phone_number']
+        user.save()
+
+        profile, _ = Profile.objects.get_or_create(user=user)
+        if 'university_id' in validated_data:
+            uni_id = validated_data['university_id']
+            profile.university = University.objects.filter(id=uni_id).first() if uni_id else None
+        if 'is_vendor' in validated_data:
+            profile.is_vendor = validated_data['is_vendor']
+        elif 'role' in validated_data:
+            profile.is_vendor = validated_data['role'].lower() == 'seller'
+        if 'profile_pic' in validated_data:
+            profile.profile_pic = validated_data['profile_pic']
+        profile.save()
+
+        return user
+
+
+class RegisterSerializer(serializers.Serializer):
     """
     Serializer for user registration.
-    
-    Handles user creation with email-based authentication.
-    Automatically creates a Profile linked to the specified university.
+    Supports standard email/password registration with optional Firebase token integration.
     """
-    firebase_token = serializers.CharField(write_only=True, required=True)
-    university_id = serializers.IntegerField(write_only=True, required=True)
-    is_vendor = serializers.BooleanField(write_only=True, required=False, default=False)
+    email = serializers.EmailField(required=True)
+    password = serializers.CharField(write_only=True, required=True, min_length=6)
+    full_name = serializers.CharField(required=False, allow_blank=True, default='')
+    phone_number = serializers.CharField(required=False, allow_blank=True, default='')
+    university_id = serializers.IntegerField(required=False, allow_null=True, default=None)
+    is_vendor = serializers.BooleanField(required=False, default=False)
+    role = serializers.CharField(required=False, default='Buyer')
 
-    class Meta:
-        model = User
-        fields = ["firebase_token", "university_id", "is_vendor"]
+    def validate_email(self, value):
+        normalized = value.strip().lower()
+        if User.objects.filter(email=normalized).exists():
+            raise serializers.ValidationError("A user with this email already exists.")
+        return normalized
 
     def validate_university_id(self, value):
-        """Ensure the university exists before attempting profile creation."""
-        if not University.objects.filter(id=value).exists():
-            raise serializers.ValidationError("University with this ID does not exist.")
+        if value is not None and not University.objects.filter(id=value).exists():
+            raise serializers.ValidationError("Selected university does not exist.")
         return value
 
     @transaction.atomic
     def create(self, validated_data):
-        """
-        Create a new user and associated profile atomically using Firebase Token.
-        """
-        university_id = validated_data.pop("university_id")
-        firebase_token = validated_data.pop("firebase_token")
-        is_vendor = validated_data.pop("is_vendor", False)
+        email = validated_data["email"]
+        password = validated_data["password"]
+        full_name = validated_data.get("full_name", "")
+        phone_number = validated_data.get("phone_number", "")
+        university_id = validated_data.get("university_id")
+        
+        is_vendor = validated_data.get("is_vendor", False)
+        role = validated_data.get("role", "Buyer")
+        if role.lower() == 'seller':
+            is_vendor = True
 
-        try:
-            decoded_token = auth.verify_id_token(firebase_token, clock_skew_seconds=60)
-            email = decoded_token.get("email")
-            if not email:
-                raise serializers.ValidationError("Firebase token missing email.")
-        except Exception as e:
-            raise serializers.ValidationError(f"Invalid Firebase token: {str(e)}")
-            
-        if User.objects.filter(email=email).exists():
-            raise serializers.ValidationError("User with this email already exists.")
-
-        # Create user with a dummy password since Firebase handles auth
         user = User.objects.create_user(
             email=email,
-            password=User.objects.make_random_password(length=24)
+            password=password
         )
+        user.full_name = full_name
+        user.phone_number = phone_number
+        user.save()
 
-        # Create profile linked to university
+        uni_instance = University.objects.filter(id=university_id).first() if university_id else None
         Profile.objects.create(
             user=user,
-            university_id=university_id,
+            university=uni_instance,
             is_vendor=is_vendor
         )
 

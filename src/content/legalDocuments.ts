@@ -1,0 +1,545 @@
+/**
+ * UNIMART CENTRAL LEGAL DOCUMENTS REPOSITORY
+ * 
+ * Single source of truth for all 13 legal policies and documents on the Unimart platform.
+ * Any edits made in this file are reflected live across the entire website and all legal routes.
+ * 
+ * Jurisdiction: Ghana
+ * Operating framework: Ghana Data Protection Act, 2012 (Act 843), Electronic Transactions Act, 2008 (Act 772)
+ */
+
+export interface LegalDocument {
+  slug: string;
+  title: string;
+  version: string;
+  effectiveDate: string;
+  description: string;
+  category: 'General Terms' | 'Privacy & Data Protection' | 'Orders & Fulfillment' | 'Seller & Verification' | 'Disputes & Enforcement' | 'Marketplace Safety';
+  lastUpdated?: string;
+  content: string;
+}
+
+export const legalDocuments: Record<string, LegalDocument> = {
+  "terms": {
+    slug: "terms",
+    title: "Terms and Conditions",
+    version: "0.1",
+    effectiveDate: "[EFFECTIVE DATE]",
+    description: "Core terms governing platform access, user accounts, listings, and marketplace conduct.",
+    category: "General Terms",
+    content: `# 1. TERMS AND CONDITIONS
+Version: 0.1  
+Effective date: [EFFECTIVE DATE]
+
+## 1.1 About these Terms
+These Terms and Conditions ("Terms") govern access to and use of Unimart Online Marketplace ("Unimart", "we", "us" or "our"), including its website, accounts, listings, messaging, reviews and related services. The marketplace is operated by: Operator: [OPERATOR LEGAL NAME]  
+Legal status: [LEGAL STATUS]  
+Address: [PHYSICAL ADDRESS]  
+Email: [SUPPORT EMAIL]  
+Telephone: [SUPPORT PHONE] Unimart is a marketplace platform. It connects buyers with independent sellers who are eligible tertiary students. Unless a listing or separate written agreement expressly states otherwise, Unimart is not the seller of products listed by users. The sale contract is between the buyer and the seller. By creating an account, using a restricted marketplace feature, submitting a listing, or placing an order, you agree to the Terms applicable to that activity. If you do not agree, do not create an account or use the relevant feature.
+
+## 1.2 Eligibility and age
+Buyers: Any person aged 18 or older may register as a buyer and purchase through Unimart. Buyers are not required to be students. Sellers: Only currently enrolled students of recognised or accredited tertiary institutions in Ghana may apply for seller privileges. Seller access is subject to successful verification and ongoing eligibility. Under-18 users: At launch, people under 18 may not create seller accounts, place orders or otherwise enter into marketplace transactions through Unimart. They may access public browsing pages only where permitted by the website's age controls. This restriction is a cautious launch measure pending advice from a Ghana-qualified lawyer. Unimart may revise it only after reviewing applicable child-protection, capacity, privacy and consent requirements. You must provide accurate information about your age and must not bypass age restrictions or use another person's identity.
+
+## 1.3 Buyer accounts
+A buyer must create an account before placing an order. Buyers do not need student verification. Unimart may require email or phone verification, identity checks, or additional information where reasonably necessary to protect users, prevent fraud, fulfil an order or comply with law. Buyers must keep their account credentials secure, provide accurate contact information and promptly notify Unimart if they suspect unauthorised account access.
+
+## 1.4 Seller eligibility and verification
+A person may sell only after: Creating an account. Providing the required seller registration information. Providing a valid student ID or other verification document accepted by Unimart. Providing an institutional email address and completing the required email verification. Passing manual review by an authorised Unimart administrator. Accepting the Seller Agreement and relevant policies. Submitting documents does not guarantee approval. Unimart may request additional evidence, reject an application, or suspend seller privileges where eligibility cannot be confirmed. Student verification is for eligibility and trust purposes. It is not a guarantee that a seller is honest, that a product is genuine, or that a transaction will be completed successfully.
+
+## 1.5 Graduate sellers and continued eligibility
+Seller privileges are available only while the user remains an eligible, currently enrolled student. Where a seller graduates or otherwise ceases to qualify: The account may be converted to buyer-only status. New listings and selling functions will be disabled. Active listings will be deactivated. Existing accepted orders must still be handled appropriately. Graduation does not automatically cancel an existing order or remove obligations already incurred. The user may continue to browse and buy as a buyer. A former seller who later enrols in another recognised tertiary programme may apply for seller privileges again by completing current verification. Unimart records the student ID expiry date and conducts an annual eligibility review. The date printed on an ID is an indicator for review and is not, by itself, a conclusive finding that a student has graduated. Administrators may request updated evidence or review the account before removing selling privileges. Where eligibility cannot be confirmed, Unimart may temporarily suspend selling privileges while the matter is reviewed.
+
+## 1.6 Products and permitted listings
+At launch, Unimart supports listings for new and used physical products, including electronics, clothing, books, furniture, accessories and other everyday student items. Digital products and services are not supported at launch. Unimart may restrict additional product categories or remove listings that are unlawful, unsafe, misleading, infringing, inappropriate for the marketplace or inconsistent with the Prohibited Products Policy. A seller must have the right to sell the listed product and must provide accurate information about its condition, ownership, specifications, defects, accessories, availability and price.
+
+## 1.7 Listing review and approval
+Every listing is subject to administrator review before publication. A submitted listing remains pending and must not be visible to buyers until approved. An administrator may approve, reject, request changes to, suspend or remove a listing. Where reasonably possible, the seller will receive the reason for rejection or requested changes. Approval is not a guarantee of product quality, authenticity, legality or seller performance. Sellers remain responsible for their listings. Significant edits to an approved listing --- including changes to price, condition, description, material specifications or images --- may trigger a new review. The changed listing may be hidden until reapproved.
+
+## 1.8 Orders and contract formation
+A buyer's order request is an offer to buy the listed product. The seller must accept or otherwise confirm the order before the parties treat it as accepted, unless the website clearly describes a different order flow. The seller and buyer are responsible for confirming product availability, final price, delivery or collection arrangements, delivery charges, payment method and any other material terms before completing the transaction. The website must clearly display the status of an order and preserve a record that the buyer and seller can access. Nothing in these Terms excludes any statutory rights or requirements concerning electronic transactions, order performance, cancellation, refunds or consumer information.
+
+## 1.9 Payments
+At launch, payments are made directly between buyer and seller. The seller may choose to accept cash, Mobile Money or bank transfer. The seller must state the accepted payment method or methods and any payment instructions before the transaction is concluded. Unimart does not initially collect, hold, escrow, receive, split or distribute the purchase price. Users must not send purchase funds to an account represented as Unimart's account unless Unimart has formally announced and legally implemented a different payment arrangement. Buyers should confirm payment details directly with the seller through the platform and should keep transaction records or receipts. Unimart currently charges no listing fees, commission or subscription fees. If fees are introduced, Unimart will give reasonable advance notice, publish updated terms and clearly disclose the amount, basis and effective date before the new fee applies. Future Paystack integration: Paystack is not part of the initial payment arrangement. Before enabling it, Unimart must review and publish updated terms covering the payment provider, merchant and settlement structure, payment collection, fees, chargebacks, refunds, failed payments, settlement timing, payment data, complaints, responsibilities and any required regulatory approvals. The implementation must match the actual funds flow and applicable Ghanaian law.
+
+## 1.10 Delivery and collection
+The seller is responsible for arranging delivery or collection with the buyer. The seller must communicate: Whether delivery, collection or both are available. The delivery or transport charge, if any. The expected delivery or collection time. The proposed meeting or collection arrangements. Any reasonable conditions for collection. The seller must make reasonable efforts to fulfil an accepted order within the agreed period. If no period is agreed, the parties must communicate promptly to agree one. Applicable statutory requirements, including requirements under Ghana's Electronic Transactions Act, continue to apply. Buyers should inspect the product before payment where practical and safe. Sellers should allow reasonable inspection. Inspection must not involve unreasonable use or damage.
+
+## 1.11 Failed collection, refusal and cancellation
+If a buyer fails to collect an item or refuses delivery, the seller should make reasonable attempts to contact the buyer and clarify the issue. If the buyer remains unavailable or refuses without a valid reason, the seller may cancel the order and report the incident to Unimart. A seller must not use this provision to avoid a valid buyer complaint, conceal a defect, or cancel an order unfairly. Any statutory cancellation or consumer right takes precedence. A buyer may cancel an order before acceptance or where the seller agrees, subject to applicable law and any clearly disclosed lawful terms.
+
+## 1.12 Inspection, returns and refunds
+Buyers may inspect products before payment where practical and safe. If the product is materially different from the listing, defective, damaged or incorrect, the buyer should contact the seller and report the issue to Unimart promptly. Unimart's preferred reporting period is within 24 hours after delivery or collection. This is a request for prompt reporting to help preserve evidence and resolve issues efficiently. It is not a contractual deadline that removes statutory rights, limits claims about latent defects, or prevents a buyer from raising an issue that could not reasonably have been discovered within 24 hours. Returns and cancellations are subject to the Refund and Returns Policy and applicable law. In particular, the Electronic Transactions Act, 2008 (Act 772), including section 49 and its exceptions, must be considered for electronic transactions. The policy must not be interpreted to remove a right that cannot lawfully be excluded. Where a refund is due, the seller is responsible for issuing it directly to the buyer under the initial payment model. Unimart may assist with communication and dispute handling but does not hold the purchase money and does not promise to fund a seller's refund.
+
+## 1.13 Messaging and contact information
+Unimart may provide built-in messaging. Users must use messaging lawfully and respectfully and must not harass, threaten, defraud, impersonate, spam or share unlawful content. Seller phone numbers are private by default. A seller may voluntarily share a phone number or WhatsApp contact. A buyer must not attempt to obtain or disclose another person's private contact information without permission. Where an order requires delivery, the seller may receive the buyer's name, phone number and delivery address to the extent necessary to fulfil the order. This information must be used only for the transaction and must not be repurposed for unsolicited marketing or unrelated contact.
+
+## 1.14 Ratings and reviews
+Only a buyer whose transaction is recorded as completed may submit a rating or review for that transaction. Reviews must be honest, relevant and based on the user's genuine experience. Users must not submit fake reviews, paid or coerced reviews, threats, personal data, defamatory content, hate speech, spam or irrelevant material. Unimart may hide or remove reviews that breach these Terms or the Review and Reporting Rules. Where practical, the reviewer and affected seller may be told why action was taken. A seller cannot demand removal merely because a review is negative.
+
+## 1.15 Reports, moderation and enforcement
+Users may report listings, profiles, reviews, messages, buyers or sellers. Unimart may investigate reports, request information, remove or restrict content, reject listings, suspend privileges or terminate accounts where justified. Unimart may take urgent protective action where there is a credible risk of fraud, harm, illegal activity, privacy violation or user safety concern. Decisions should be proportionate to the reported conduct and available evidence. Where reasonably possible, an affected user will receive notice of the action and a way to appeal. Unimart may limit details where disclosure would compromise an investigation, another person's privacy, user safety or legal obligations.
+
+## 1.16 Account suspension, termination and deletion
+Unimart may suspend or terminate accounts for violations of these Terms, fraud, unsafe conduct, repeated complaints, false verification, prohibited listings, harassment, non-fulfilment or legal requirements. Users may request account deletion through [ACCOUNT DELETION METHOD / SUPPORT EMAIL]. Deletion is subject to outstanding orders, disputes, investigations, legal obligations and lawful retention requirements. Unimart will delete or anonymise personal information when it is no longer required, subject to applicable law and legitimate retention grounds.
+
+## 1.17 Intellectual property
+Users must own or have permission to use the text, photographs, logos and other material they upload. By uploading material, a user grants Unimart a limited, non-exclusive, royalty-free permission to host, reproduce, display and technically process that material solely to operate, promote and improve the marketplace and display the user's listing or review. This permission ends when the material is removed, subject to backup, legal and dispute-related retention. Users must not upload material that infringes copyright, trademarks, privacy rights or other rights. Unimart may remove material following a credible complaint and may restrict repeat infringers. Unimart's name, branding, software and original site content are owned by or licensed to the operator. Users may not copy or exploit them without permission.
+
+## 1.18 Disclaimers and limitation of responsibility
+Unimart provides a platform for users to find one another and communicate. Unless expressly stated otherwise, Unimart does not own, inspect, manufacture, warrant or sell the products listed by users and does not take possession of them. Unimart does not guarantee that a seller is honest, a product is authentic, a listing is accurate, a buyer will pay, or a transaction will be completed. Verification and listing approval are risk-reduction measures, not guarantees. Nothing in these Terms excludes or limits liability where doing so would be unlawful, including mandatory consumer rights, data protection obligations, liability for fraud or any other liability that cannot lawfully be excluded. Any limitation must be interpreted only to the extent permitted by Ghanaian law.
+
+## 1.19 Changes to these Terms
+Unimart may update these Terms to reflect changes in law, platform features, safety measures, fees or business operations. Material changes will be notified through the website, email or another reasonable channel. Where required, users will be asked to accept the revised Terms before continuing to use affected features. The version and effective date will be displayed at the top of the document.
+
+## 1.20 Governing law and complaints
+These Terms are governed by the laws of Ghana, subject to mandatory legal rights and the jurisdiction of competent Ghanaian courts. Users should first contact Unimart through [SUPPORT EMAIL], [SUPPORT PHONE] or [COMPLAINTS FORM URL]. Nothing in this clause prevents a user from approaching a regulator, law enforcement agency or court with proper jurisdiction.`
+  },
+
+  "privacy": {
+    slug: "privacy",
+    title: "Privacy Policy",
+    version: "0.1",
+    effectiveDate: "[EFFECTIVE DATE]",
+    description: "Explains how personal information and student verification data are collected, protected, and used under Ghana Act 843.",
+    category: "Privacy & Data Protection",
+    content: `# 2. PRIVACY POLICY
+Version: 0.1  
+Effective date: [EFFECTIVE DATE]
+
+## 2.1 Who is responsible for your personal data?
+The data controller responsible for the personal data processed through Unimart is: Controller: [OPERATOR LEGAL NAME]  
+Address: [PHYSICAL ADDRESS]  
+Privacy contact: [PRIVACY CONTACT EMAIL]  
+General support: [SUPPORT EMAIL] Unimart must complete and verify its Data Protection Commission registration and other obligations under the Data Protection Act, 2012 (Act 843), before processing personal data where registration is required. Do not insert a registration number unless registration has been granted.
+
+## 2.2 Information we collect
+Depending on whether you browse, register as a buyer, apply to sell, list products or place an order, Unimart may collect:
+
+### Account and profile information
+Full name. Phone number. Email address. Profile picture. Account credentials and account settings.
+
+### Seller verification information
+Institution name. Student ID number. Photograph or scanned copy of student ID. Institutional email address and verification status. Student ID expiry date, where shown. Verification review notes and decision history. Student ID images and student numbers are confidential verification information. They must not be displayed publicly or made available to ordinary buyers or sellers.
+
+### Transaction and marketplace information
+Product listings, images, descriptions and prices. Order details and order status. Buyer and seller communications through Unimart. Delivery or collection details needed to fulfil an order. Ratings, reviews, reports and complaint information. Payment method selected and transaction confirmation details supplied by users. Unimart does not initially collect or hold the purchase money.
+
+### Technical and usage information
+IP address and device/browser information, where collected. Log data, security events and approximate usage information. Cookie identifiers and analytics/advertising data, subject to the applicable consent choices and technical configuration.
+
+### Information supplied in support requests
+Information you choose to provide when contacting support, reporting a user or requesting account deletion.
+
+## 2.3 Why we use information
+We use personal information for purposes including: Creating and managing user accounts. Verifying sellers' student status and eligibility. Reviewing, approving and moderating listings. Enabling buyers and sellers to communicate. Supporting orders, delivery and collection. Recording completed transactions for verified-purchase reviews. Investigating complaints, fraud, abuse and policy violations. Protecting platform security and enforcing our Terms. Responding to support requests and account deletion requests. Meeting legal, regulatory and record-keeping obligations. Measuring website performance and usage through analytics. Measuring and improving advertising through Google Ads, where enabled and permitted by the user's consent choices. Maintaining, debugging and improving Unimart. We will not use student ID documents for public display or advertising.
+
+## 2.4 Legal basis and transparency
+Unimart will identify and document an appropriate lawful basis for each processing purpose under Ghana's Data Protection Act, 2012 (Act 843). Depending on the activity, this may include consent, necessity for a contract, legal obligation or another lawful justification recognised by the Act. Where consent is relied upon, it must be informed, specific and capable of being withdrawn. Consent to non-essential analytics or advertising cookies must be separate from acceptance of the Terms and must not be treated as mandatory account consent. At or before collection, Unimart will explain what information is collected, who is responsible, why it is collected, whether it is required, the consequences of not providing it, who may receive it and the user's relevant rights.
+
+## 2.5 Who may receive information?
+Information may be disclosed, where necessary and lawful, to: The buyer or seller involved in a particular transaction, limited to information needed to arrange and fulfil that transaction. Authorised Unimart administrators handling verification, support, moderation or disputes. Website hosting, database, email, security, analytics and other technology providers acting on Unimart's instructions or under their own applicable terms. Google services used for Analytics and Ads, subject to the actual configuration and consent choices. Professional advisers, regulators, law enforcement or courts where disclosure is required or legally justified. A successor operator in a lawful restructuring or transfer, subject to appropriate safeguards and notice where required. Unimart must not sell student ID documents or private account information. It must not disclose seller phone numbers publicly by default. A seller may voluntarily share their phone or WhatsApp contact. Where delivery is requested, the seller may receive the buyer's name, phone number and delivery address to the extent necessary to complete the delivery. Such information must not be used for unrelated marketing.
+
+## 2.6 Google Analytics and Google Ads
+Unimart intends to use Google Analytics and Google Ads. Before publication, the technical team must confirm the exact products, tags, account IDs, events, conversion tracking, remarketing features, consent configuration and data-sharing settings actually in use. These tools may collect or receive information such as device/browser identifiers, pages viewed, interactions, approximate location inferred from technical data, advertising identifiers and conversion events, depending on configuration. Non-essential analytics and advertising tags must remain blocked until the user has made the relevant consent choice. Users must be able to reject non-essential tracking as easily as they can accept it and later change their choices through [COOKIE SETTINGS URL]. Unimart must review Google's applicable terms and privacy information and assess international data transfers, retention, data sharing and user controls. Do not state that Google receives a particular data field or that a particular Google feature is enabled unless the live implementation confirms it.
+
+## 2.7 Cookies and similar technologies
+Unimart may use: - Strictly necessary cookies for account login, security and core site operation. - Preference cookies to remember settings. - Analytics cookies, if enabled. - Advertising and conversion cookies, if enabled. The Cookie Policy explains the categories and controls. Non-essential cookies and tracking scripts must not be activated before the relevant consent is obtained. A user must be able to change or withdraw their consent.
+
+## 2.8 Security
+Unimart will use reasonable technical and organisational measures appropriate to the sensitivity of the information, including student ID documents. Measures should include: Role-based access to verification records. Strong administrator authentication and least-privilege permissions. Encryption in transit and appropriate encryption at rest. Secure storage of uploaded identity documents outside public web directories. Access logging and periodic access reviews. Secure password hashing and account recovery. Backups and tested recovery procedures. Vulnerability, dependency and access-control reviews. Staff and administrator confidentiality obligations. A documented process for handling suspected data breaches. No online system can be guaranteed completely secure. Users should protect their credentials and report suspected account compromise promptly.
+
+## 2.9 Retention
+Unimart will retain personal information only for as long as reasonably necessary for the purpose for which it was collected, unless a longer period is required or permitted by law, contract, dispute handling or another lawful purpose. Student ID images should be retained only while needed for verification, periodic eligibility checks, fraud prevention or a documented legal purpose. Unimart should define a specific retention schedule after legal and operational review. Do not retain ID images indefinitely by default. When information is no longer required, it should be securely deleted or de-identified. Backups should expire under a documented backup-retention cycle.
+
+## 2.10 User rights
+Subject to applicable law and relevant exceptions, users may have rights to: - Be informed about processing. - Request access to personal information. - Request correction of inaccurate information. - Object to certain processing. - Withdraw consent where consent is the basis. - Request deletion or blocking where legally available. - Complain to Unimart or the Data Protection Commission. Requests may be sent to [PRIVACY CONTACT EMAIL]. Unimart may need to verify the identity of the requester before acting.
+
+## 2.11 Account deletion
+Users may request account deletion through [ACCOUNT DELETION METHOD] or [SUPPORT EMAIL]. Unimart will explain whether an order, complaint, investigation, legal duty or other lawful retention reason prevents immediate deletion of particular records. Where possible, information no longer needed will be deleted or anonymised. Account deletion does not automatically erase records that must lawfully be retained.
+
+## 2.12 International processing
+Some technology providers may process information outside Ghana. Before enabling a provider, Unimart must identify the countries and providers involved and assess applicable transfer requirements and safeguards under Ghanaian law. The live Privacy Policy must identify relevant categories of recipients and explain material international processing.
+
+## 2.13 Children and under-18 users
+At launch, Unimart will block users under 18 from purchasing or selling pending legal review. The website must not assume that a person is an adult merely because they have a tertiary student ID. The age-gating design, data collection from minors and any future consent or guardian process must be approved by a Ghana-qualified lawyer before changes are made.
+
+## 2.14 Changes and contact
+We may update this Privacy Policy when our practices, technology or legal obligations change. Material changes will be communicated through the website or another reasonable method. Questions or privacy requests: [PRIVACY CONTACT EMAIL]  
+Postal address: [PHYSICAL ADDRESS]`
+  },
+
+  "refunds-returns": {
+    slug: "refunds-returns",
+    title: "Refund and Returns Policy",
+    version: "0.1",
+    effectiveDate: "[EFFECTIVE DATE]",
+    description: "Rules and guidelines for product inspection, reporting defective items, returns, and seller refunds.",
+    category: "Orders & Fulfillment",
+    content: `# 3. REFUND AND RETURNS POLICY
+Version: 0.1  
+Effective date: [EFFECTIVE DATE]
+
+## 3.1 Who is responsible?
+The seller is the person selling the product and is responsible for the product, its description, fulfilment and any refund or return obligation arising from the transaction. At launch, buyers pay sellers directly. Unimart does not hold the purchase money and does not promise to issue refunds from its own funds. Unimart may receive complaints, investigate platform conduct, facilitate communication and help the parties reach a resolution. This policy does not remove any statutory rights or obligations.
+
+## 3.2 When may a buyer request a return or refund?
+A buyer should contact the seller and Unimart if the product: Is defective or does not function as reasonably described. Is damaged on arrival or at collection, other than damage clearly disclosed before purchase. Is materially different from the listing. Is the wrong item or materially incomplete. Was not delivered or made available as agreed. Is subject to another return or cancellation right under applicable law. The buyer should provide the order reference, photographs or video where relevant, a description of the issue and the date the item was received or collected.
+
+## 3.3 Change-of-mind cancellation
+A buyer may request cancellation or return because they changed their mind. Whether the request can be accepted depends on the applicable law, the product, statutory exceptions and the transaction circumstances. For electronic transactions, section 49 of Ghana's Electronic Transactions Act, 2008 (Act 772) provides a 14-day cancellation period for goods, subject to exceptions. The legal applicability of the Act to particular seller and marketplace arrangements, and any relevant exceptions, must be reviewed by a Ghana-qualified lawyer. This policy must not be used to deny a statutory cancellation right. Where no statutory right applies, a change-of-mind return may be subject to the seller's agreement and any lawful terms disclosed before purchase.
+
+## 3.4 Reporting period
+Buyers are encouraged to report a problem within 24 hours after delivery or collection. This helps preserve evidence and allows the seller to respond quickly. The 24-hour period is not a strict forfeiture deadline. It does not remove statutory rights or prevent a buyer from reporting a latent defect or problem that could not reasonably have been discovered within 24 hours.
+
+## 3.5 Inspection before payment
+Where practical and safe, buyers may inspect a product before payment. Sellers should allow reasonable inspection. Buyers may decline to proceed if the product materially differs from the listing. Inspection must be reasonable and must not damage, misuse or unreasonably consume the product.
+
+## 3.6 How to request a return or refund
+Contact the seller through Unimart messaging and explain the issue. Keep the conversation, listing and transaction details. Submit a complaint to Unimart through [COMPLAINTS FORM URL] or [SUPPORT EMAIL] if the issue is unresolved or involves suspected misconduct. Provide reasonable supporting evidence. Cooperate with reasonable requests for clarification or inspection. Unimart may contact both parties, review the listing and communications, request evidence and recommend a resolution.
+
+## 3.7 Who pays the refund?
+Under the initial payment arrangement, the seller is responsible for issuing any refund directly to the buyer where a refund is due. The seller and buyer should agree a safe and traceable refund method. Unimart does not hold the original payment and cannot guarantee that a seller has sufficient funds to refund. This does not affect any legal right the buyer may have against the seller or any responsibility that applicable law places on Unimart.
+
+## 3.8 Return delivery costs
+Responsibility for return delivery costs depends on the reason for the return, the parties' agreement and applicable law. Where a statutory rule controls, that rule takes precedence. The seller must not impose a charge that applicable law prohibits.
+
+## 3.9 Evidence and fair handling
+Buyers should not alter, repair, dispose of or continue using a disputed product beyond what is reasonably necessary to identify or prevent further damage, unless safety requires it. Sellers should not intimidate buyers, destroy evidence or refuse to communicate in good faith.
+
+## 3.10 Unimart's role
+Unimart may: - Facilitate communication. - Review listings and platform records. - Request evidence from either party. - Remove misleading listings. - Restrict or suspend accounts for misconduct. - Recommend a fair outcome. Unimart does not act as a court and does not guarantee a particular dispute outcome. Its platform enforcement decision is separate from any legal claim a buyer or seller may pursue.`
+  },
+
+  "delivery": {
+    slug: "delivery",
+    title: "Shipping, Delivery and Collection Policy",
+    version: "0.1",
+    effectiveDate: "[EFFECTIVE DATE]",
+    description: "Guidelines for seller-arranged deliveries, campus meetups, collection arrangements, and transit costs.",
+    category: "Orders & Fulfillment",
+    content: `# 4. SHIPPING, DELIVERY AND COLLECTION POLICY
+Version: 0.1  
+Effective date: [EFFECTIVE DATE]
+
+## 4.1 Seller-arranged fulfilment
+At launch, sellers arrange delivery or collection directly with buyers. Unimart does not operate a delivery fleet or guarantee third-party delivery services.
+
+## 4.2 Required listing and order information
+Before the buyer commits, the seller should clearly state: - Whether delivery, collection or both are available. - Delivery areas or collection location. - Delivery charge or other transport cost. - Estimated delivery or collection time. - Any relevant delivery restrictions. - Contact and coordination arrangements. The full price, including transport costs and other applicable charges, should be clear before the transaction is concluded.
+
+## 4.3 Delivery and collection arrangements
+The seller and buyer must agree on the delivery or collection method and time. Both parties should use reasonable care when arranging meetups. Where possible, choose a public, well-lit location and avoid sharing unnecessary personal information. The buyer should provide an accurate delivery address only where delivery is requested. The seller should use it only to fulfil the order.
+
+## 4.4 Delays and non-delivery
+If a seller expects a delay, the seller should promptly notify the buyer and agree a revised arrangement. If the seller cannot supply the product, the seller must notify the buyer and address any refund obligation under applicable law. If a buyer fails to collect an item or refuses delivery, the seller should make reasonable attempts to contact the buyer. If the buyer remains unavailable or refuses without a valid reason, the seller may cancel the order and report the incident to Unimart.
+
+## 4.5 Inspection and proof
+Where practical and safe, the buyer may inspect the product before payment. Both parties should keep reasonable evidence of handover, delivery, collection and payment, such as messages or receipts.
+
+## 4.6 Responsibility
+The seller is responsible for arranging and carrying out the agreed delivery or collection. The buyer is responsible for providing accurate information and being reasonably available at the agreed time. These responsibilities do not remove any mandatory rights or obligations under law.`
+  },
+
+  "seller-agreement": {
+    slug: "seller-agreement",
+    title: "Seller Agreement",
+    version: "0.1",
+    effectiveDate: "[EFFECTIVE DATE] This Seller Agreement applies to every user approved to sell on Unimart.",
+    description: "Binding commitments, verification requirements, and responsibilities for approved student sellers in Ghana.",
+    category: "Seller & Verification",
+    content: `# 5. SELLER AGREEMENT
+Version: 0.1  
+Effective date: [EFFECTIVE DATE] This Seller Agreement applies to every user approved to sell on Unimart.
+
+## 5.1 Eligibility
+I confirm that I am currently enrolled at a recognised or accredited tertiary institution in Ghana and that the information and documents I provide for verification are accurate and genuine. I understand that seller privileges are conditional on continuing student eligibility. Unimart may request updated evidence or review my eligibility periodically.
+
+## 5.2 Verification
+I authorise Unimart to review the student ID and institutional email information I submit for the limited purpose of verifying seller eligibility, preventing misuse and administering seller privileges, in accordance with the Privacy Policy and applicable law. I understand that my student ID image and number are confidential verification information and must not be publicly displayed.
+
+## 5.3 Product responsibility
+I am responsible for: - Owning the product or having authority to sell it. - Ensuring the product is lawful to sell. - Providing accurate descriptions and genuine photographs. - Disclosing whether the product is new or used. - Disclosing known defects, damage, missing parts and material limitations. - Setting a truthful price and disclosing additional costs. - Keeping my listings accurate and up to date. - Removing or updating unavailable products. - Responding to buyers honestly and respectfully. I will not list prohibited, counterfeit, stolen, unsafe or unlawful products.
+
+## 5.4 Listing approval
+I understand that all listings require administrator approval before becoming visible to buyers. Submitting a listing does not guarantee publication. I will not attempt to bypass moderation or publish contact details, prohibited content or misleading information in listing fields. Significant edits may require renewed approval.
+
+## 5.5 Orders and fulfilment
+I will confirm product availability, price, payment method, delivery charge and delivery or collection arrangements with the buyer before accepting an order. I will make reasonable efforts to fulfil accepted orders within the agreed period. I will promptly inform the buyer if I cannot fulfil an order. If a buyer fails to collect an item or refuses delivery, I will make reasonable attempts to contact the buyer before cancelling. I will not use this rule to avoid a legitimate complaint.
+
+## 5.6 Payment
+At launch, I receive payment directly from the buyer. I may choose to accept cash, Mobile Money or bank transfer and must clearly communicate the accepted method or methods. I understand that Unimart does not initially collect or hold buyer funds. I must not falsely tell a buyer that Unimart guarantees payment or holds the buyer's money.
+
+## 5.7 Refunds and returns
+I am responsible for issuing refunds directly to buyers where required by applicable law, the transaction terms or the Refund and Returns Policy. I will respond reasonably to complaints about defective, damaged, incorrect or materially misrepresented products. I understand that the platform's 24-hour prompt-reporting request does not remove statutory rights or prevent a buyer from raising a latent issue.
+
+## 5.8 Buyer information
+I will use a buyer's name, phone number, delivery address and other transaction information only to communicate about and fulfil the relevant transaction, handle a related complaint or meet a legal obligation. I will not sell, publish or use buyer information for unrelated marketing. I will take reasonable steps to protect information received through Unimart.
+
+## 5.9 Communications and conduct
+I will not harass, threaten, discriminate against, defraud, impersonate, spam or intimidate buyers or other users. I will not solicit payment through deceptive means or ask users to disclose passwords, verification codes or sensitive credentials.
+
+## 5.10 Reviews and reports
+I understand that only buyers with recorded completed transactions may leave transaction reviews. I will not manipulate ratings, threaten reviewers or submit fake reviews. I may report a review that genuinely violates platform rules, but I cannot demand removal simply because it is negative.
+
+## 5.11 Fees
+Unimart is free at launch. No listing fee, commission or subscription is currently charged. Any future fee will be subject to advance notice and updated terms before it takes effect.
+
+## 5.12 Graduation and loss of eligibility
+If I graduate or otherwise cease to qualify, Unimart may convert my account to buyer-only status, deactivate my listings and disable my ability to create new listings or sell. Existing accepted orders remain my responsibility and must be handled appropriately. My account may continue to be used for buying. If I later enrol in another recognised tertiary programme, I may apply again for seller privileges by completing current verification.
+
+## 5.13 Enforcement
+Unimart may reject or remove listings, request corrections, suspend seller privileges or terminate accounts where there is a breach of this Agreement, suspected fraud, unsafe conduct, false verification or another justified platform-safety reason. Where reasonably possible, I will be given a reason and an opportunity to appeal.
+
+## 5.14 Acknowledgement
+By selecting the seller acceptance checkbox and submitting it, I confirm that I have read and agree to this Seller Agreement, the Terms and Conditions, Privacy Policy, Refund and Returns Policy and Prohibited Products Policy.`
+  },
+
+  "cookies": {
+    slug: "cookies",
+    title: "Cookie Policy",
+    version: "0.1",
+    effectiveDate: "[EFFECTIVE DATE]",
+    description: "Information on strictly necessary cookies, analytics, advertising, and how to manage cookie preferences.",
+    category: "Privacy & Data Protection",
+    content: `# 6. COOKIE POLICY
+Version: 0.1  
+Effective date: [EFFECTIVE DATE]
+
+## 6.1 What are cookies?
+Cookies are small files or similar identifiers stored on a device or browser. Websites may also use pixels, tags, scripts and other technologies to remember preferences, measure activity or support advertising.
+
+### Strictly necessary technologies
+These support core functions such as login, security, session management and remembering essential privacy choices. They may operate without optional analytics or advertising consent where legally permitted.
+
+### Preference technologies
+These remember choices such as language or display preferences. Their classification depends on whether they are essential to a feature requested by the user.
+
+### Analytics technologies
+Unimart intends to use Google Analytics to understand website usage and improve the service. These technologies must remain disabled until the required consent is obtained.
+
+### Advertising technologies
+Unimart intends to use Google Ads for advertising measurement and related features. The exact use of conversion tags, remarketing or other advertising features must be confirmed from the live implementation. These technologies must remain disabled until the required consent is obtained.
+
+## 6.3 Consent controls
+The cookie banner must provide equally clear choices to: - Accept all optional cookies. - Reject optional cookies. - Manage preferences by category. Optional analytics and advertising tags must not fire before consent. Rejecting optional cookies must not prevent access to core marketplace functions. Users must be able to reopen cookie settings and change or withdraw their choices through [COOKIE SETTINGS URL].
+
+## 6.4 Third-party providers
+Google may process information through the Google Analytics and Google Ads integrations. The actual data collected, provider configuration, retention and international processing must be checked before publication.
+
+## 6.5 Cookie inventory
+The development team must maintain a live inventory containing: - Cookie or tag name. - Provider. - Purpose. - Category. - Data collected or accessed. - Expiry or retention period. - Whether it is first-party or third-party. - Whether it is activated before or after consent. Do not invent cookie names or expiry periods in this policy. Populate the inventory from the live website and tag manager.
+
+## 6.6 Updates
+This policy will be updated when new tracking tools or cookies are introduced.`
+  },
+
+  "disclaimer": {
+    slug: "disclaimer",
+    title: "Marketplace Disclaimer",
+    version: "0.1",
+    effectiveDate: "[EFFECTIVE DATE] Unimart is an online marketplace intended to connect buyers with independent student sellers. Unless a separate written statement expressly says otherwise, Unimart is not the owner, manufacturer, supplier or seller of products listed by users. Product listings are supplied by sellers. Sellers are responsible for the accuracy of their descriptions, photographs, prices, product condition, availability, ownership and fulfilment. Student verification and listing approval are administrative safeguards. They do not guarantee a seller's character, a product's authenticity, safety or condition, or successful completion of a transaction. At launch, buyers pay sellers directly. Unimart does not hold or distribute purchase funds. Unimart may help users communicate and may investigate complaints or enforce platform rules, but it does not guarantee that a seller will issue a refund. Nothing in this Disclaimer removes a right or obligation that cannot lawfully be excluded under Ghanaian law. Consumers should review the seller's listing, confirm material details, agree on delivery and payment arrangements and keep transaction records.",
+    description: "Clarifies Unimart’s role as an intermediary marketplace connecting independent student sellers with buyers.",
+    category: "General Terms",
+    content: `# 7. MARKETPLACE DISCLAIMER
+Version: 0.1  
+Effective date: [EFFECTIVE DATE] Unimart is an online marketplace intended to connect buyers with independent student sellers. Unless a separate written statement expressly says otherwise, Unimart is not the owner, manufacturer, supplier or seller of products listed by users. Product listings are supplied by sellers. Sellers are responsible for the accuracy of their descriptions, photographs, prices, product condition, availability, ownership and fulfilment. Student verification and listing approval are administrative safeguards. They do not guarantee a seller's character, a product's authenticity, safety or condition, or successful completion of a transaction. At launch, buyers pay sellers directly. Unimart does not hold or distribute purchase funds. Unimart may help users communicate and may investigate complaints or enforce platform rules, but it does not guarantee that a seller will issue a refund. Nothing in this Disclaimer removes a right or obligation that cannot lawfully be excluded under Ghanaian law. Consumers should review the seller's listing, confirm material details, agree on delivery and payment arrangements and keep transaction records.`
+  },
+
+  "disputes": {
+    slug: "disputes",
+    title: "Dispute Resolution and Complaints Policy",
+    version: "0.1",
+    effectiveDate: "[EFFECTIVE DATE]",
+    description: "Procedures for reporting order issues, mediating conflicts between buyers and sellers, and appeals.",
+    category: "Disputes & Enforcement",
+    content: `# 8. DISPUTE RESOLUTION AND COMPLAINTS POLICY
+Version: 0.1  
+Effective date: [EFFECTIVE DATE]
+
+## 8.1 Contact and submission
+Users may submit complaints through: - Support email: [SUPPORT EMAIL] - Support telephone/WhatsApp: [SUPPORT PHONE] - In-platform support form: [COMPLAINTS FORM URL] A complaint should include the user's account details, order or listing reference, a description of the issue, relevant dates and supporting evidence.
+
+## 8.2 Types of complaints
+Complaints may concern: - Defective, damaged, incorrect or misrepresented products. - Non-delivery or failure to make an item available. - Buyer failure to pay or collect. - Suspected scams, fake listings or prohibited products. - Harassment, threats or abusive messages. - Privacy or account-security concerns. - Fake or abusive reviews. - Unfair account or listing moderation.
+
+## 8.3 Initial communication
+Where safe and appropriate, the buyer and seller should first attempt to resolve a transaction issue through Unimart messaging. Users should not contact another user in a threatening or abusive manner. A user may report directly to Unimart where the issue involves fraud, safety, harassment, illegal goods, privacy or another urgent concern.
+
+## 8.4 Investigation
+Unimart may: 1. Acknowledge the complaint. 2. Review relevant listing, account, order and messaging records. 3. Request information from the parties. 4. Ask for photographs, receipts or other evidence. 5. Temporarily restrict content or accounts where reasonably necessary. 6. Facilitate communication and recommend a resolution. 7. Take platform enforcement action where justified. 8. Close the complaint with an explanation, subject to privacy and safety limits. Unimart should aim to acknowledge complaints within [TARGET ACKNOWLEDGEMENT PERIOD] and provide an initial update within [TARGET UPDATE PERIOD]. These targets must be selected and staffed before publication. Do not publish response-time promises that the team cannot meet.
+
+## 8.5 Refund responsibility
+Under the initial model, the seller is responsible for issuing a refund directly to the buyer where a refund is due. Unimart can facilitate and investigate but does not hold the purchase funds or guarantee a refund from its own funds.
+
+## 8.6 Platform decisions
+Unimart may decide whether content or conduct breaches platform rules and may remove listings, restrict features, suspend accounts or terminate access. Such a platform decision is not a court judgment and does not determine all legal rights or liabilities between buyer and seller.
+
+## 8.7 Appeals
+A user affected by a moderation or account decision may request a review through [APPEAL CONTACT / FORM]. The appeal should identify the decision, explain why it is disputed and include relevant evidence. Where possible, a different administrator should review the appeal. Unimart may maintain an urgent restriction while reviewing a credible safety or fraud concern.
+
+## 8.8 External remedies
+Nothing in this policy prevents a user from contacting law enforcement, a regulator, the Data Protection Commission, a consumer-protection authority with jurisdiction, or a court.`
+  },
+
+  "acceptable-use": {
+    slug: "acceptable-use",
+    title: "Acceptable Use and Prohibited Products Policy",
+    version: "0.1",
+    effectiveDate: "[EFFECTIVE DATE]",
+    description: "List of prohibited items, weapons, counterfeits, and required standards of acceptable platform conduct.",
+    category: "Marketplace Safety",
+    content: `# 9. ACCEPTABLE USE AND PROHIBITED PRODUCTS POLICY
+Version: 0.1  
+Effective date: [EFFECTIVE DATE]
+
+## 9.1 General rule
+Unimart supports lawful listings for new and used physical products relevant to student and everyday life. Sellers must have legal authority to sell each product and must describe it accurately.
+
+## 9.2 Prohibited listings
+The following are prohibited, whether offered for sale, exchange or promotion: Stolen goods or goods the seller has no right to sell. Counterfeit products or goods that infringe intellectual property rights. Illegal drugs, controlled substances or unlawful drug-related products. Firearms, ammunition, explosives, prohibited weapons or weapon accessories restricted by law. Hazardous chemicals, poisons or dangerous substances offered unlawfully. Human organs, human remains, protected wildlife or other unlawful biological materials. Fraudulent documents, forged student IDs, fake certificates or identity documents. Products that exploit, abuse or endanger children. Sexually exploitative material or unlawful pornography. Products recalled, banned or restricted by a competent authority, where sale is prohibited. Products whose sale is otherwise unlawful under Ghanaian law. Any other category that Unimart identifies as unsafe or incompatible with the marketplace. This list is not exhaustive. Unimart may restrict additional categories for safety, legal or operational reasons.
+
+## 9.3 Prohibited conduct
+Users must not: - Create fake accounts or impersonate another person. - Submit false student verification documents. - Manipulate ratings or reviews. - Mislead buyers about product condition, ownership or availability. - Use the platform for scams, phishing or money laundering. - Harass, threaten or discriminate against users. - Circumvent listing review or account restrictions. - Upload malware, spam or unlawful content. - Collect or misuse another user's personal information. - Use Unimart to arrange unlawful transactions.
+
+## 9.4 Reporting and enforcement
+Users may report suspected prohibited listings through the Report function or [COMPLAINTS FORM URL]. Unimart may remove a listing, request evidence, restrict the account, suspend selling privileges or report suspected unlawful conduct to the appropriate authority.`
+  },
+
+  "intellectual-property": {
+    slug: "intellectual-property",
+    title: "Intellectual Property Policy",
+    version: "0.1",
+    effectiveDate: "[EFFECTIVE DATE]",
+    description: "Guidelines on trademarks, copyrighted images, reporting infringements, and protecting rights holders.",
+    category: "Marketplace Safety",
+    content: `# 10. INTELLECTUAL PROPERTY POLICY
+Version: 0.1  
+Effective date: [EFFECTIVE DATE]
+
+## 10.1 Respect for rights
+Users must not list, upload, reproduce or distribute content that infringes copyright, trademarks, design rights, privacy rights or other rights. Sellers should use photographs they created or have permission to use. Product photographs should accurately represent the item being sold. A seller must not use another seller's images to misrepresent the product.
+
+## 10.2 Reporting infringement
+A rights holder or authorised representative may submit a notice to [IP COMPLAINT EMAIL] containing: - Name and contact details. - Identification of the protected work or mark. - The listing or content complained of. - An explanation of the alleged infringement. - Evidence of ownership or authority to act. - A statement that the information is accurate and submitted in good faith.
+
+## 10.3 Review and removal
+Unimart may request additional information, temporarily restrict the content, remove the listing or take action against repeat infringers. Unimart may notify the uploader and provide a reasonable process to respond, where appropriate.
+
+## 10.4 Repeat infringement
+Repeated or serious infringement may result in account suspension or termination.
+
+## 10.5 Contact
+Intellectual property notices: [IP COMPLAINT EMAIL].`
+  },
+
+  "payments-fees": {
+    slug: "payments-fees",
+    title: "Payment, Fees and Commission Policy",
+    version: "0.1",
+    effectiveDate: "[EFFECTIVE DATE]",
+    description: "Details on direct buyer-to-seller payments (Cash, MoMo, Bank Transfer) and future fee disclosures.",
+    category: "Orders & Fulfillment",
+    content: `# 11. PAYMENT, FEES AND COMMISSION POLICY
+Version: 0.1  
+Effective date: [EFFECTIVE DATE]
+
+## 11.1 Current payment arrangement
+At launch, Unimart does not process or hold purchase payments. Buyers pay sellers directly using a payment method the seller accepts. Sellers may choose to accept: - Cash. - Mobile Money. - Bank transfer. The seller must disclose the accepted payment method or methods and any payment instructions before the buyer commits to the transaction.
+
+## 11.2 No current marketplace fees
+Unimart currently charges: - No listing fee. - No sales commission. - No buyer subscription. - No seller subscription. If Unimart introduces fees, it will provide reasonable prior notice, publish the updated fee terms and explain when the charges take effect. A fee must not be applied retroactively to a completed transaction unless the parties lawfully agreed otherwise.
+
+## 11.3 Direct payment risk
+Because payment is made directly to the seller, buyers should verify payment details and keep proof of payment. Unimart cannot reverse a cash payment or independently retrieve funds from a seller's bank or Mobile Money account. Users should report suspected payment fraud promptly.
+
+## 11.4 Future Paystack integration
+Paystack may be integrated in the future. Before activation, Unimart must determine and document: - Which entity is the merchant or payee. - Whether payments are collected for sellers or by Unimart. - Whether funds are held, delayed, split or settled. - Who pays processing fees. - How refunds, reversals and chargebacks work. - How failed or duplicate payments are handled. - What payment data Unimart receives or stores. - What disclosures and consents are required. - Whether the structure triggers licensing, authorisation or other regulatory requirements. - Which Paystack terms and Bank of Ghana requirements apply. The Payment Systems and Services Act, 2019 (Act 987) regulates payment service providers and related activities. Unimart must not assume that using a licensed provider automatically resolves every legal issue for its own marketplace structure. Obtain Ghana-qualified legal and payment-provider advice before launch of the integration.`
+  },
+
+  "account-suspension": {
+    slug: "account-suspension",
+    title: "Account Suspension and Termination Policy",
+    version: "0.1",
+    effectiveDate: "[EFFECTIVE DATE]",
+    description: "Grounds for moderation, warnings, suspensions, graduation transitions, and account appeals.",
+    category: "Disputes & Enforcement",
+    content: `# 12. ACCOUNT SUSPENSION AND TERMINATION POLICY
+Version: 0.1  
+Effective date: [EFFECTIVE DATE]
+
+## 12.1 Reasons for action
+Unimart may warn, restrict, suspend or terminate an account where it reasonably believes that a user: - Breached the Terms or a marketplace policy. - Submitted false or misleading verification information. - Listed prohibited, stolen, counterfeit or unsafe goods. - Engaged in fraud, harassment, threats or abuse. - Repeatedly failed to fulfil accepted orders or misused buyer information. - Manipulated reviews or reports. - Attempted to bypass moderation or security controls. - No longer qualifies for seller privileges. - Is subject to a lawful direction or other valid legal requirement.
+
+## 12.2 Proportionate action
+Depending on seriousness and risk, Unimart may: - Request clarification or additional evidence. - Reject or temporarily hide a listing. - Require a listing correction. - Restrict messaging or listing privileges. - Temporarily suspend selling or buying features. - Convert a graduate seller account to buyer-only status. - Suspend or terminate the account. Urgent action may be taken without advance notice where necessary to protect users, preserve evidence or comply with law. Where reasonably possible, the user will be informed afterward.
+
+## 12.3 Graduation
+A seller who graduates or otherwise ceases to qualify may retain the account as a buyer. Selling privileges and active listings will be disabled. Existing accepted orders must still be handled appropriately.
+
+## 12.4 Appeals
+Users may appeal through [APPEAL CONTACT / FORM]. Unimart should provide a reason where reasonably possible and review relevant evidence. A different administrator should review an appeal where staffing permits.
+
+## 12.5 Deletion and retention
+Suspension or termination does not automatically delete all records. Unimart may retain information for a lawful period to resolve outstanding transactions, disputes, security incidents, legal claims or regulatory obligations. Information no longer required will be deleted or anonymised.`
+  },
+
+  "student-verification": {
+    slug: "student-verification",
+    title: "Student Verification and Seller Eligibility Policy",
+    version: "0.1",
+    effectiveDate: "[EFFECTIVE DATE]",
+    description: "Verification criteria, required student IDs, institutional email verification, and annual eligibility audits.",
+    category: "Seller & Verification",
+    content: `# 13. STUDENT VERIFICATION AND SELLER ELIGIBILITY POLICY
+Version: 0.1  
+Effective date: [EFFECTIVE DATE]
+
+## 13.1 Purpose
+This policy explains how Unimart confirms that sellers are currently enrolled tertiary students in Ghana.
+
+## 13.2 Who may sell?
+Only currently enrolled students of recognised or accredited tertiary institutions in Ghana may sell. This includes eligible students at public and private universities, technical universities, colleges of education, nursing and midwifery training colleges and other recognised tertiary institutions. If the status of an institution or programme is unclear, administrators must verify recognition/accreditation rather than assume eligibility.
+
+## 13.3 Required information
+Seller applicants must provide: - Full name. - Phone number. - Email address. - Institution name. - Student ID number. - Photograph or scan of student ID. - Institutional email address and successful email verification. - Profile picture. Unimart may request additional evidence where necessary to confirm eligibility. The Privacy Policy governs how verification information is used and retained.
+
+## 13.4 Manual review
+An authorised administrator reviews the student ID and verifies the institutional email. The administrator may approve, reject or request additional information. A seller cannot publish listings until verification is approved.
+
+## 13.5 Annual review and graduation
+Unimart records the ID expiry date where available and conducts an annual seller eligibility review. The expiry date is a review signal; it is not conclusive proof of graduation. If a seller has graduated or is no longer eligible, the account becomes buyer-only. Active listings are deactivated. Existing accepted orders must be dealt with appropriately. If an ID is expired, unreadable, invalid or cannot be confirmed, administrators review the case and may request updated documents or suspend selling privileges while eligibility is unresolved.
+
+## 13.6 Security and confidentiality
+Only authorised administrators may access student ID images and related verification records. These documents must not be accessible through public URLs or exposed in buyer-facing APIs, pages, logs or analytics events.`
+  },
+
+};
+
+/**
+ * Retrieve a legal document by its URL slug.
+ */
+export const getLegalDocument = (slug: string): LegalDocument | undefined => {
+  return legalDocuments[slug];
+};
+
+/**
+ * Retrieve all legal documents as an array.
+ */
+export const getAllLegalDocuments = (): LegalDocument[] => {
+  return Object.values(legalDocuments);
+};
+
+/**
+ * Retrieve documents grouped by category.
+ */
+export const getLegalDocumentsByCategory = (): Record<string, LegalDocument[]> => {
+  const grouped: Record<string, LegalDocument[]> = {};
+  for (const doc of Object.values(legalDocuments)) {
+    if (!grouped[doc.category]) {
+      grouped[doc.category] = [];
+    }
+    grouped[doc.category].push(doc);
+  }
+  return grouped;
+};

@@ -69,7 +69,7 @@ class ReviewSerializer(serializers.ModelSerializer):
             # Look for completed orders where user is buyer and product matches
             has_purchased = Order.objects.filter(
                 buyer=user,
-                product=product,
+                items__product=product,
                 status__in=['paid', 'shipped', 'completed']
             ).exists()
             
@@ -78,9 +78,7 @@ class ReviewSerializer(serializers.ModelSerializer):
                     'product': "You can only review products you have purchased."
                 })
             
-            # Check for duplicate review (additional check, though model enforces this)
-            # This provides a better error message
-            if self.instance is None:  # Only check on create, not update
+            if self.instance is None:
                 if Review.objects.filter(user=user, product=product).exists():
                     raise serializers.ValidationError({
                         'product': "You have already reviewed this product."
@@ -90,12 +88,7 @@ class ReviewSerializer(serializers.ModelSerializer):
 
 
 class ReviewListSerializer(serializers.ModelSerializer):
-    """
-    Serializer for listing reviews with user details.
-    
-    Used in ReviewListView to provide user information
-    without exposing sensitive data.
-    """
+    user_name = serializers.CharField(source='user.full_name', read_only=True, default='')
     user_email = serializers.EmailField(source='user.email', read_only=True)
     product_title = serializers.CharField(source='product.title', read_only=True)
     product_id = serializers.IntegerField(source='product.id', read_only=True)
@@ -104,6 +97,7 @@ class ReviewListSerializer(serializers.ModelSerializer):
         model = Review
         fields = [
             'id',
+            'user_name',
             'user_email',
             'product_id',
             'product_title',

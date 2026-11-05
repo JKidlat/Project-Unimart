@@ -1,39 +1,63 @@
 from rest_framework import serializers
-from .models import Product
+from .models import Product, Category
+from universities.models import University
+
+
+class CategorySerializer(serializers.ModelSerializer):
+    product_count = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Category
+        fields = ['id', 'name', 'slug', 'icon', 'image', 'color', 'product_count']
+
+    def get_product_count(self, obj):
+        return obj.products.filter(is_available=True).count()
 
 
 class ProductSerializer(serializers.ModelSerializer):
-    """
-    Serializer for Product model.
-    
-    The seller field is read-only because it's automatically set from request.user
-    in the view's perform_create() method. This prevents users from creating products
-    under someone else's name.
-    """
-    # Use StringRelatedField to display seller email, or ReadOnlyField with email source
-    seller = serializers.StringRelatedField(read_only=True)
-    # Alternative: seller = serializers.ReadOnlyField(source="seller.email")
-    
-    # Computed field for average rating from reviews
+    # Aliases for frontend compatibility
+    name = serializers.CharField(source='title', required=False)
+    oldPrice = serializers.DecimalField(source='old_price', max_digits=10, decimal_places=2, required=False, allow_null=True)
+    category_name = serializers.CharField(source='category.name', read_only=True, default='')
+    category_id = serializers.PrimaryKeyRelatedField(
+        queryset=Category.objects.all(), 
+        source='category', 
+        required=False, 
+        allow_null=True
+    )
+    university_name = serializers.CharField(source='university.name', read_only=True, default='')
+    university_id = serializers.PrimaryKeyRelatedField(
+        queryset=University.objects.all(), 
+        source='university', 
+        required=False
+    )
     average_rating = serializers.SerializerMethodField(read_only=True)
+    seller_details = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = Product
-        fields = "__all__"
-        read_only_fields = ['seller', 'created_at']  # Seller is set from request.user, created_at is auto-set
+        fields = [
+            'id', 'title', 'name', 'description', 'price', 'old_price', 'oldPrice',
+            'condition', 'image', 'product_type', 'is_available', 'category_id',
+            'category_name', 'university_id', 'university_name', 'seller_details',
+            'average_rating', 'created_at', 'updated_at'
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at']
 
     def get_average_rating(self, obj):
-        """Calculate and return the average rating for this product."""
         return obj.average_rating
 
+    def get_seller_details(self, obj):
+        seller = obj.seller
+        return {
+            'id': seller.id,
+            'name': seller.full_name or seller.email.split('@')[0],
+            'email': seller.email,
+            'rating': obj.average_rating,
+            'verified': getattr(seller, 'is_verified_student', True)
+        }
+
     def validate_price(self, value):
-        """Ensure price is greater than zero."""
         if value <= 0:
             raise serializers.ValidationError("Price must be greater than zero.")
         return value
-
-    def validate_title(self, value):
-        """Ensure title is not empty."""
-        if not value or not value.strip():
-            raise serializers.ValidationError("Title cannot be empty.")
-        return value.strip()

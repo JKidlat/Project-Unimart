@@ -58,6 +58,7 @@ class User(AbstractBaseUser, PermissionsMixin):
     The USERNAME_FIELD is set to 'email', so users log in with their email address.
     """
     email = models.EmailField(unique=True)
+    full_name = models.CharField(max_length=255, blank=True)
     phone_number = models.CharField(max_length=20, blank=True)
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False)
@@ -95,6 +96,12 @@ class Profile(models.Model):
     is_vendor = models.BooleanField(
         default=False,
         help_text="Whether the user can sell products in the marketplace."
+    )
+    profile_pic = models.CharField(
+        max_length=500,
+        blank=True,
+        null=True,
+        help_text="URL or path to user's profile avatar."
     )
     referral_code = models.CharField(
         max_length=20,

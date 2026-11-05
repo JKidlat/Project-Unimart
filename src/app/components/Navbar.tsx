@@ -1,0 +1,297 @@
+/**
+ * ==============================================================================
+ * GLOBAL NAVIGATION BAR (Navbar.tsx)
+ * ==============================================================================
+ * This component provides the primary header navigation across all standard
+ * marketplace pages.
+ *
+ * Core Features:
+ * 1. Brand Logo:
+ *    - Unimart gradient logo with quick redirect to homepage ('/').
+ * 2. Primary Navigation Links:
+ *    - Home, Shop, Sell, Messages, Help Center.
+ * 3. Search Overlay:
+ *    - Toggleable dropdown search input that syncs with `setSearchQuery` in UserContext.
+ * 4. Shopping Cart Indicator:
+ *    - Displays live item count badge populated from CartContext.
+ * 5. Role-Aware Profile Pill:
+ *    - Displays user's first name, avatar, and color-coded role badge:
+ *        - Teal badge for Buyer
+ *        - Amber badge for Seller
+ *        - Red button link for Admin Suite
+ * 6. Responsive Mobile Hamburger Menu:
+ *    - Animated drawer with accessible tap targets for phones and small tablets.
+ * ==============================================================================
+ */
+
+import React, { useState } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router';
+import { Search, ShoppingCart, User, Menu, X, Briefcase, ShieldCheck } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
+import { useUser } from '../context/UserContext';
+import { useCart } from '../context/CartContext';
+
+export const Navbar = () => {
+  // Local state for mobile menu toggle and search bar overlay
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [localSearch, setLocalSearch] = useState('');
+
+  // Global user and cart context
+  const { user, setSearchQuery, isLoggedIn } = useUser();
+  const { itemCount } = useCart();
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  // ----------------------------------------------------------------------------
+  // Handler: Global Search Form Submit
+  // ----------------------------------------------------------------------------
+  const handleSearchSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setSearchQuery(localSearch);
+    setIsSearchOpen(false);
+    if (location.pathname !== '/shop') {
+      navigate('/shop');
+    }
+  };
+
+  // Primary desktop navigation links
+  const navLinks = [
+    { name: 'Home', path: '/' },
+    { name: 'Shop', path: '/shop' },
+    { name: 'Sell', path: '/sell' },
+    { name: 'Messages', path: '/messages' },
+    { name: 'Help', path: '/help-center' },
+  ];
+
+  /**
+   * Role badge configuration:
+   * - Sellers get an amber briefcase badge.
+   * - Buyers get a teal user icon badge.
+   */
+  const roleBadge = user?.role === 'Seller'
+    ? { bg: 'bg-amber-500', icon: <Briefcase className="w-2.5 h-2.5 text-white" /> }
+    : { bg: 'bg-teal-500', icon: <User className="w-2.5 h-2.5 text-white" /> };
+
+  return (
+    <nav className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-[#f3d7db]">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="flex justify-between items-center h-20">
+          
+          {/* ============================================================== */}
+          {/* 1. BRAND LOGO                                                  */}
+          {/* ============================================================== */}
+          <Link to="/" className="flex items-center space-x-2">
+            <div className="w-10 h-10 bg-gradient-to-br from-[#a14b58] to-[#6f323d] rounded-xl flex items-center justify-center shadow-lg shadow-[#a14b584d]">
+              <span className="text-white font-bold text-2xl">U</span>
+            </div>
+            <span className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-[#a14b58] to-[#6f323d]">
+              Unimart
+            </span>
+          </Link>
+
+          {/* ============================================================== */}
+          {/* 2. DESKTOP NAVIGATION LINKS                                    */}
+          {/* ============================================================== */}
+          <div className="hidden md:flex items-center space-x-8">
+            {navLinks.map((link) => (
+              <Link
+                key={link.name}
+                to={link.path}
+                className={`text-sm font-bold transition-colors hover:text-[#a14b58] ${
+                  location.pathname === link.path ? 'text-[#a14b58]' : 'text-gray-600'
+                }`}
+              >
+                {link.name}
+              </Link>
+            ))}
+          </div>
+
+          {/* ============================================================== */}
+          {/* 3. ACTION ICONS & PROFILE PILL                                 */}
+          {/* ============================================================== */}
+          <div className="flex items-center space-x-2 md:space-x-5">
+            {/* Search Icon (Toggles overlay) */}
+            <button
+              onClick={() => setIsSearchOpen(!isSearchOpen)}
+              className="p-2 text-gray-600 hover:text-[#a14b58] transition-colors"
+              aria-label="Toggle search bar"
+            >
+              <Search className="w-5 h-5" />
+            </button>
+
+            {/* Cart Icon with Live Item Count Badge */}
+            <Link to="/cart" className="p-2 text-gray-600 hover:text-[#a14b58] transition-colors relative" aria-label="Shopping Cart">
+              <ShoppingCart className="w-5 h-5" />
+              {itemCount > 0 && (
+                <span className="absolute top-0 right-0 w-4 h-4 bg-[#a14b58] text-white text-[10px] flex items-center justify-center rounded-full font-bold">
+                  {itemCount}
+                </span>
+              )}
+            </Link>
+
+            {/* Admin Suite Quick Link (Visible only to authenticated admins) */}
+            {isLoggedIn && (user?.role === 'Admin' || user?.is_staff) && (
+              <Link
+                to="/admin"
+                className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#a14b58] text-white rounded-xl text-xs font-bold shadow-xs hover:bg-[#863b48] transition-all"
+              >
+                <ShieldCheck className="w-3.5 h-3.5" />
+                <span>Admin Suite</span>
+              </Link>
+            )}
+
+            {/* Authenticated User Profile Pill */}
+            {isLoggedIn && user ? (
+              <Link
+                to="/profile"
+                className="hidden sm:flex items-center space-x-2 p-1 pl-2 border border-gray-100 rounded-full hover:bg-gray-50 transition-all"
+              >
+                <div className="hidden lg:flex flex-col items-end leading-none">
+                  <span className="text-xs font-bold text-gray-700">{user.name.split(' ')[0]}</span>
+                  <span className={`text-[9px] font-bold uppercase tracking-wide ${
+                    user.role === 'Seller' ? 'text-amber-500' : 'text-teal-500'
+                  }`}>
+                    {user.role}
+                  </span>
+                </div>
+                {/* Avatar with role status dot */}
+                <div className="relative">
+                  <div className="w-8 h-8 rounded-full bg-[#fcf6f7] flex items-center justify-center text-[#a14b58] font-bold overflow-hidden border border-[#f3d7db]">
+                    {user.profilePic ? (
+                      <img src={user.profilePic} alt="Profile" className="w-full h-full object-cover" />
+                    ) : (
+                      user.name[0]
+                    )}
+                  </div>
+                  <div className={`absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full border-2 border-white flex items-center justify-center ${roleBadge.bg}`}>
+                    {roleBadge.icon}
+                  </div>
+                </div>
+              </Link>
+            ) : (
+              // Guest Sign-In Button
+              <Link
+                to="/signin"
+                className="hidden sm:flex items-center gap-2 px-4 py-2 bg-[#a14b58] text-white rounded-xl text-sm font-bold hover:bg-[#863b48] transition-all"
+              >
+                Sign In
+              </Link>
+            )}
+
+            {/* Mobile Hamburger Menu Toggle Button */}
+            <button
+              className="md:hidden p-2 text-gray-600"
+              onClick={() => setIsMenuOpen(!isMenuOpen)}
+              aria-label="Toggle navigation menu"
+            >
+              {isMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* ============================================================== */}
+      {/* 4. MOBILE DROPDOWN DRAWER                                      */}
+      {/* ============================================================== */}
+      <AnimatePresence>
+        {isMenuOpen && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            className="md:hidden bg-white border-b border-[#f3d7db] overflow-hidden"
+          >
+            <div className="px-4 pt-2 pb-6 space-y-1">
+              {navLinks.map((link) => (
+                <Link
+                  key={link.name}
+                  to={link.path}
+                  onClick={() => setIsMenuOpen(false)}
+                  className="block px-3 py-3 text-base font-medium text-gray-600 hover:text-[#a14b58] hover:bg-[#fcf6f7] rounded-lg transition-colors"
+                >
+                  {link.name}
+                </Link>
+              ))}
+
+              {isLoggedIn && user ? (
+                <Link
+                  to="/profile"
+                  onClick={() => setIsMenuOpen(false)}
+                  className="flex items-center justify-between px-3 py-3 text-base font-medium text-gray-600 hover:text-[#a14b58] hover:bg-[#fcf6f7] rounded-lg transition-colors"
+                >
+                  <div className="flex items-center space-x-2">
+                    <div className="relative">
+                      <div className="w-8 h-8 rounded-full bg-[#fcf6f7] flex items-center justify-center text-[#a14b58] font-bold border border-[#f3d7db]">
+                        {user.name[0]}
+                      </div>
+                      <div className={`absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full border-2 border-white flex items-center justify-center ${roleBadge.bg}`}>
+                        {roleBadge.icon}
+                      </div>
+                    </div>
+                    <span>{user.name.split(' ')[0]}</span>
+                  </div>
+                  <span className={`text-xs font-bold uppercase tracking-wide px-2 py-0.5 rounded-full ${
+                    user.role === 'Seller'
+                      ? 'bg-amber-100 text-amber-600'
+                      : 'bg-teal-100 text-teal-600'
+                  }`}>
+                    {user.role}
+                  </span>
+                </Link>
+              ) : (
+                <Link
+                  to="/signin"
+                  onClick={() => setIsMenuOpen(false)}
+                  className="block px-3 py-3 text-base font-bold text-white bg-[#a14b58] hover:bg-[#863b48] rounded-lg transition-colors text-center mt-2"
+                >
+                  Sign In
+                </Link>
+              )}
+
+              {/* Creator / Admin Portal Shortcut */}
+              <div className="pt-2 border-t border-gray-100 mt-2">
+                <Link
+                  to="/admin/login"
+                  onClick={() => setIsMenuOpen(false)}
+                  className="block px-3 py-2 text-xs font-bold text-[#a14b58] hover:bg-[#fcf6f7] rounded-lg transition-colors text-center"
+                >
+                  Creator / Admin Portal →
+                </Link>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ============================================================== */}
+      {/* 5. SEARCH OVERLAY DRAWER                                       */}
+      {/* ============================================================== */}
+      <AnimatePresence>
+        {isSearchOpen && (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="absolute top-20 left-0 w-full bg-white border-b border-[#f3d7db] p-4 shadow-lg"
+          >
+            <form onSubmit={handleSearchSubmit} className="max-w-3xl mx-auto relative">
+              <input
+                type="text"
+                placeholder="Search for laptops, textbooks, dorm decor..."
+                className="w-full pl-12 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#a14b58] transition-all"
+                autoFocus
+                value={localSearch}
+                onChange={(e) => setLocalSearch(e.target.value)}
+              />
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
+              <button type="submit" className="absolute right-4 top-1/2 -translate-y-1/2 text-[10px] font-black text-[#a14b58] uppercase tracking-widest hover:underline">
+                Search
+              </button>
+            </form>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </nav>
+  );
+};
