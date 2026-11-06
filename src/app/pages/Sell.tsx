@@ -202,9 +202,9 @@ export const Sell = () => {
               >
                 <option value="">Select Category</option>
                 <option value="electronics">Electronics</option>
-                <option value="books">Textbooks</option>
-                <option value="fashion">Fashion</option>
-                <option value="home">Hostel Essentials</option>
+                <option value="dorm-essentials">Dorm Essentials</option>
+                <option value="clothing">Clothing & Fashion</option>
+                <option value="books-stationery">Books & Stationery</option>
               </select>
             </div>
             <div className="space-y-2">
@@ -213,10 +213,10 @@ export const Sell = () => {
                 className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-[#a14b58] outline-none"
                 onChange={(e) => setFormData({...formData, condition: e.target.value})}
               >
-                <option value="new">Brand New</option>
-                <option value="used_excellent">Used - Excellent</option>
-                <option value="used_good">Used - Good</option>
-                <option value="used_fair">Used - Fair</option>
+                <option value="New">Brand New</option>
+                <option value="Like New">Like New</option>
+                <option value="Good">Good</option>
+                <option value="Fair">Fair</option>
               </select>
             </div>
           </div>

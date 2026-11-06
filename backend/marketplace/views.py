@@ -7,8 +7,9 @@ from rest_framework.response import Response
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.filters import SearchFilter, OrderingFilter
 from django.db.models import Q
-from .models import Product, Category
-from .serializers import ProductSerializer, CategorySerializer
+from .models import Product, Category, WishlistItem
+from .serializers import ProductSerializer, CategorySerializer, WishlistItemSerializer
+
 from core.permissions import IsOwnerOrReadOnly
 
 
@@ -73,10 +74,17 @@ class ProductListCreateView(generics.ListCreateAPIView):
 
     def perform_create(self, serializer):
         user = self.request.user
+        # Verify user has seller / vendor role or is admin
+        is_vendor = getattr(user, 'profile', None) and user.profile.is_vendor
+        if not (user.is_staff or user.is_superuser or is_vendor):
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied("Only verified student sellers can list products. Please complete seller verification first.")
+
         university = serializer.validated_data.get('university')
         if not university and hasattr(user, 'profile') and user.profile.university:
             university = user.profile.university
         serializer.save(seller=user, university=university)
+
 
 
 class ProductDetailView(generics.RetrieveUpdateDestroyAPIView):
@@ -90,3 +98,34 @@ class ProductDetailView(generics.RetrieveUpdateDestroyAPIView):
         if self.request.method in ['PUT', 'PATCH', 'DELETE']:
             return [permissions.IsAuthenticated(), IsOwnerOrReadOnly()]
         return [permissions.AllowAny()]
+
+
+class WishlistView(generics.ListCreateAPIView):
+    """
+    List user wishlist items or add an item to the wishlist.
+    """
+    serializer_class = WishlistItemSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        return WishlistItem.objects.filter(user=self.request.user).select_related(
+            'product', 'product__seller', 'product__category', 'product__university'
+        )
+
+    def perform_create(self, serializer):
+        product = serializer.validated_data['product']
+        WishlistItem.objects.get_or_create(user=self.request.user, product=product)
+
+
+class WishlistDetailView(generics.DestroyAPIView):
+    """
+    Remove an item from the wishlist by product ID.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def delete(self, request, *args, **kwargs):
+        product_id = kwargs.get('product_id')
+        deleted, _ = WishlistItem.objects.filter(user=request.user, product_id=product_id).delete()
+        if deleted:
+            return Response({'message': 'Removed from wishlist'}, status=status.HTTP_200_OK)
+        return Response({'message': 'Item was not in wishlist'}, status=status.HTTP_404_NOT_FOUND)

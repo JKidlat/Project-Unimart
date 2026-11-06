@@ -24,9 +24,12 @@ ENV/
 .vscode/
 *.swp
 
-# Node
+# Node / Build
 node_modules/
 frontend/node_modules/
+dist/
+build/
+*.bak
 
 # Firebase / Credentials
 firebase-credentials.json

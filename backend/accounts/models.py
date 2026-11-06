@@ -117,3 +117,46 @@ class Profile(models.Model):
     def __str__(self):
         """String representation of the profile."""
         return self.user.email
+
+
+class KYCSubmission(models.Model):
+    """
+    KYC (Know Your Customer) Seller Verification Submission.
+    Holds proof of identity, selfie, institutional email, and review state.
+    """
+    STATUS_CHOICES = [
+        ('pending', 'Pending Review'),
+        ('approved', 'Approved'),
+        ('rejected', 'Rejected'),
+    ]
+    MODE_CHOICES = [
+        ('seller_first', 'Seller Registration'),
+        ('buyer_upgrade', 'Buyer Upgrade'),
+    ]
+
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="kyc_submissions"
+    )
+    email = models.EmailField()
+    institution_email = models.EmailField(blank=True)
+    business_name = models.CharField(max_length=255, blank=True)
+    selfie_url = models.TextField(blank=True, help_text="Base64 or URL of student selfie")
+    id_doc_url = models.TextField(blank=True, help_text="Base64 or URL of Student ID or Ghana Card")
+    mode = models.CharField(max_length=30, choices=MODE_CHOICES, default='buyer_upgrade')
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    rejection_reason = models.TextField(blank=True, null=True)
+    submitted_at = models.DateTimeField(auto_now_add=True)
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['-submitted_at']
+        indexes = [
+            models.Index(fields=['user', 'status']),
+            models.Index(fields=['email']),
+        ]
+
+    def __str__(self):
+        return f"KYC: {self.email} ({self.status})"
+

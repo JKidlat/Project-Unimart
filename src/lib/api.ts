@@ -309,6 +309,18 @@ async function handleMockFallback(endpoint: string, options: RequestInit = {}): 
     return initialCategories;
   }
 
+  // --- Fallback: Universities List ---
+  if (endpoint.includes('/universities')) {
+    return initialUniversities.map((uni, idx) => {
+      const match = uni.match(/^(.*?)\s*\((.*?)\)$/);
+      return {
+        id: idx + 1,
+        name: match ? match[1] : uni,
+        short_name: match ? match[2] : uni
+      };
+    });
+  }
+
   // --- Fallback 6: Orders Management & Status Tracking ---
   if (endpoint.includes('/orders')) {
     let orders: any[] = [];

@@ -9,17 +9,24 @@ Authentication endpoints:
 """
 
 from django.urls import path
-from .views import RegisterView, LogoutView, UserProfileView, UserListView
-from rest_framework_simplejwt.views import (
-    TokenObtainPairView,
-    TokenRefreshView,
+from .views import (
+    LoginView,
+    RegisterView,
+    LogoutView,
+    UserProfileView,
+    UserListView,
+    KYCSubmissionView,
+    KYCDetailView,
 )
+from rest_framework_simplejwt.views import TokenRefreshView
 
 urlpatterns = [
-    path("login/", TokenObtainPairView.as_view(), name="login"),
+    path("login/", LoginView.as_view(), name="login"),
     path("token/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
     path("register/", RegisterView.as_view(), name="register"),
     path("logout/", LogoutView.as_view(), name="logout"),
     path("me/", UserProfileView.as_view(), name="user_profile"),
     path("users/", UserListView.as_view(), name="user_list"),
+    path("kyc/", KYCSubmissionView.as_view(), name="kyc-list-create"),
+    path("kyc/<str:lookup>/", KYCDetailView.as_view(), name="kyc-detail"),
 ]

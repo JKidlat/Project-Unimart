@@ -34,11 +34,20 @@ class OrderListCreateView(generics.ListCreateAPIView):
 class OrderDetailView(generics.RetrieveUpdateAPIView):
     """
     Retrieve order details or update order status.
+    Scoped strictly to the buyer, sellers involved in the order, or administrators.
     """
     permission_classes = [permissions.IsAuthenticated]
-    queryset = Order.objects.all().prefetch_related('items', 'items__product')
+
+    def get_queryset(self):
+        user = self.request.user
+        if user.is_staff or user.is_superuser:
+            return Order.objects.all().prefetch_related('items', 'items__product')
+        return Order.objects.filter(
+            Q(buyer=user) | Q(items__seller=user)
+        ).distinct().prefetch_related('items', 'items__product')
 
     def get_serializer_class(self):
         if self.request.method in ['PUT', 'PATCH']:
             return OrderStatusUpdateSerializer
         return OrderSerializer
+

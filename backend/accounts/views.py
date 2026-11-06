@@ -7,10 +7,40 @@ from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated, IsAdminUser
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.exceptions import TokenError
-from .serializers import RegisterSerializer, UserProfileSerializer, ProfileUpdateSerializer
+from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
+from rest_framework_simplejwt.views import TokenObtainPairView
+from django.utils import timezone
+from .models import KYCSubmission
+from .serializers import RegisterSerializer, UserProfileSerializer, ProfileUpdateSerializer, KYCSubmissionSerializer
 from django.contrib.auth import get_user_model
 
+
 User = get_user_model()
+
+
+class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
+    """
+    Custom JWT token serializer returning tokens wrapped with full user profile payload.
+    Supports both standard DRF JWT clients and the Unimart frontend format.
+    """
+    def validate(self, attrs):
+        data = super().validate(attrs)
+        user_data = UserProfileSerializer(self.user).data
+        data['tokens'] = {
+            'access': data['access'],
+            'refresh': data['refresh'],
+        }
+        data['user'] = user_data
+        data['message'] = 'Login successful.'
+        return data
+
+
+class LoginView(TokenObtainPairView):
+    """
+    Login endpoint that issues JWT tokens and returns the authenticated user profile.
+    """
+    serializer_class = CustomTokenObtainPairSerializer
+
 
 
 class RegisterView(generics.CreateAPIView):
@@ -108,7 +138,58 @@ class UserProfileView(generics.RetrieveUpdateAPIView):
 class UserListView(generics.ListAPIView):
     """
     Admin user listing endpoint.
+    Restricted to staff and admin users to protect student privacy.
     """
     queryset = User.objects.all().select_related('profile', 'profile__university')
     serializer_class = UserProfileSerializer
+    permission_classes = [IsAdminUser]
+
+
+class KYCSubmissionView(generics.ListCreateAPIView):
+    """
+    List user KYC submissions or submit new verification documents.
+    Admin gets all submissions (with optional ?email= filter); normal users see their own.
+    """
+    serializer_class = KYCSubmissionSerializer
     permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        if user.is_staff or user.is_superuser:
+            email_filter = self.request.query_params.get('email')
+            if email_filter:
+                return KYCSubmission.objects.filter(email=email_filter)
+            return KYCSubmission.objects.all()
+        return KYCSubmission.objects.filter(user=user)
+
+    def perform_create(self, serializer):
+        user = self.request.user
+        email = serializer.validated_data.get('email') or user.email
+        serializer.save(user=user, email=email, status='pending')
+
+
+class KYCDetailView(generics.RetrieveUpdateAPIView):
+    """
+    Retrieve or update KYC verification status (Admin only).
+    Supports lookup by integer primary key or by user email string.
+    When status transitions to 'approved', automatically upgrades user to Seller (is_vendor=True).
+    """
+    queryset = KYCSubmission.objects.all()
+    serializer_class = KYCSubmissionSerializer
+    permission_classes = [IsAdminUser]
+
+    def get_object(self):
+        lookup = self.kwargs.get('lookup')
+        if str(lookup).isdigit():
+            return generics.get_object_or_404(KYCSubmission, id=int(lookup))
+        return generics.get_object_or_404(KYCSubmission, email=lookup)
+
+    def perform_update(self, serializer):
+        instance = serializer.save(reviewed_at=timezone.now())
+        if instance.status == 'approved':
+            profile = getattr(instance.user, 'profile', None)
+            if profile:
+                profile.is_vendor = True
+                profile.save(update_fields=['is_vendor'])
+
+

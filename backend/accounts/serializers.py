@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
 from django.db import transaction
-from .models import Profile
+from .models import Profile, KYCSubmission
 from universities.models import University
 
 User = get_user_model()
@@ -16,13 +16,15 @@ class UserProfileSerializer(serializers.ModelSerializer):
     role = serializers.SerializerMethodField()
     orders_count = serializers.SerializerMethodField()
     wishlist_count = serializers.SerializerMethodField()
+    kyc_status = serializers.SerializerMethodField()
     
     class Meta:
         model = User
         fields = [
             'id', 'email', 'full_name', 'phone_number', 'is_active', 'is_staff', 
             'is_verified_student', 'university_id', 'university_name', 'is_vendor', 
-            'role', 'profile_pic', 'referral_code', 'referrals_count', 'orders_count', 'wishlist_count'
+            'role', 'profile_pic', 'referral_code', 'referrals_count', 'orders_count',
+            'wishlist_count', 'kyc_status'
         ]
 
     def get_role(self, obj):
@@ -40,7 +42,18 @@ class UserProfileSerializer(serializers.ModelSerializer):
             return 0
 
     def get_wishlist_count(self, obj):
-        return 0
+        try:
+            return obj.wishlist_items.count()
+        except Exception:
+            return 0
+
+    def get_kyc_status(self, obj):
+        try:
+            sub = obj.kyc_submissions.first()
+            return sub.status if sub else 'none'
+        except Exception:
+            return 'none'
+
 
 
 class ProfileUpdateSerializer(serializers.Serializer):
@@ -86,6 +99,8 @@ class RegisterSerializer(serializers.Serializer):
     university_id = serializers.IntegerField(required=False, allow_null=True, default=None)
     is_vendor = serializers.BooleanField(required=False, default=False)
     role = serializers.CharField(required=False, default='Buyer')
+    referral_code = serializers.CharField(required=False, allow_blank=True, default='')
+
 
     def validate_email(self, value):
         normalized = value.strip().lower()
@@ -126,4 +141,34 @@ class RegisterSerializer(serializers.Serializer):
             is_vendor=is_vendor
         )
 
+        ref_code = validated_data.get("referral_code", "").strip()
+        if ref_code:
+            referrer_profile = Profile.objects.filter(referral_code__iexact=ref_code).first()
+            if referrer_profile and referrer_profile.user != user:
+                referrer_profile.referrals_count += 1
+                referrer_profile.save(update_fields=['referrals_count'])
+
         return user
+
+
+class KYCSubmissionSerializer(serializers.ModelSerializer):
+    user_email = serializers.EmailField(source='user.email', read_only=True)
+    user_name = serializers.CharField(source='user.full_name', read_only=True)
+    email = serializers.EmailField(required=False)
+    selfieBase64 = serializers.CharField(source='selfie_url', required=False, allow_blank=True)
+
+    idDocBase64 = serializers.CharField(source='id_doc_url', required=False, allow_blank=True)
+    institutionEmail = serializers.EmailField(source='institution_email', required=False, allow_blank=True)
+    businessName = serializers.CharField(source='business_name', required=False, allow_blank=True)
+    rejectionReason = serializers.CharField(source='rejection_reason', required=False, allow_null=True)
+    submittedAt = serializers.DateTimeField(source='submitted_at', read_only=True)
+    reviewedAt = serializers.DateTimeField(source='reviewed_at', read_only=True)
+
+    class Meta:
+        model = KYCSubmission
+        fields = [
+            'id', 'user_email', 'user_name', 'email', 'institutionEmail', 'businessName',
+            'selfieBase64', 'idDocBase64', 'mode', 'status', 'rejectionReason',
+            'submittedAt', 'reviewedAt'
+        ]
+        read_only_fields = ['id', 'user_email', 'user_name', 'submittedAt', 'reviewedAt']

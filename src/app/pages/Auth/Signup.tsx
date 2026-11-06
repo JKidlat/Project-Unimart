@@ -80,7 +80,9 @@ export const Signup = () => {
 
     setLoading(true);
     try {
-      const newUser = await signup(formData);
+      const refCode = new URLSearchParams(window.location.search).get('ref') || '';
+      const newUser = await signup({ ...formData, referral_code: refCode });
+
       
       // Persist immutable legal acceptance records for audit compliance (Ghana Act 843 & Act 772)
       const userId = (newUser as any)?.id || formData.email;

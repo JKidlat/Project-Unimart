@@ -214,6 +214,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
         role: formData.role || 'Buyer',
         is_vendor: formData.role === 'Seller',
         business_name: formData.businessName || null,
+        referral_code: formData.referral_code || formData.referralCode || '',
       });
 
       if (res.tokens?.access) {
