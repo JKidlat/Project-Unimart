@@ -104,11 +104,31 @@ import { SystemStatus } from './pages/Help/SystemStatus';
 // ============================================================================
 // State Context Providers & Route Guards
 // ============================================================================
-import { UserProvider } from './context/UserContext';
+import { UserProvider, useUser } from './context/UserContext';
 import { KYCProvider } from './context/KYCContext';
 import { WishlistProvider } from './context/WishlistContext';
 import { CartProvider, useCart } from './context/CartContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
+
+/**
+ * DynamicHome Component:
+ * - If user is not logged in (guest): renders default Home landing page.
+ * - Immediately the user logs in: switches default homepage to Shop.
+ */
+const DynamicHome = () => {
+  const { isLoggedIn, isLoading } = useUser();
+
+  if (isLoading) {
+    return (
+      <div className="min-h-[60vh] flex flex-col items-center justify-center gap-3">
+        <div className="w-8 h-8 border-4 border-[#a14b58] border-t-transparent rounded-full animate-spin" />
+        <span className="text-xs font-bold text-gray-400">Loading your campus feed...</span>
+      </div>
+    );
+  }
+
+  return isLoggedIn ? <Shop /> : <Home />;
+};
 
 /**
  * ScrollToTop Component:
@@ -150,9 +170,9 @@ const AppContent = () => {
       <main className="flex-1">
         <Routes>
           {/* ============================================================== */}
-          {/* 1. PUBLIC MARKETPLACE ROUTES (No authentication required)       */}
+          {/* 1. PUBLIC MARKETPLACE ROUTES (Dynamic homepage: Shop when logged in, Home when guest) */}
           {/* ============================================================== */}
-          <Route path="/" element={<Home />} />
+          <Route path="/" element={<DynamicHome />} />
           <Route path="/shop" element={<Shop />} />
           <Route path="/product/:id" element={<ProductDetails />} />
           <Route path="/cart" element={<Cart />} />

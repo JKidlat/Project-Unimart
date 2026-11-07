@@ -43,7 +43,19 @@ class ProductListCreateView(generics.ListCreateAPIView):
         return [permissions.AllowAny()]
 
     def get_queryset(self):
-        queryset = Product.objects.filter(is_available=True).select_related(
+        status_param = self.request.query_params.get('status')
+        user = self.request.user
+
+        if status_param and (getattr(user, 'is_staff', False) or getattr(user, 'is_superuser', False)):
+            if status_param == 'all':
+                queryset = Product.objects.all()
+            else:
+                queryset = Product.objects.filter(status=status_param)
+        else:
+            # Public shop only shows approved live products
+            queryset = Product.objects.filter(status='live', is_available=True)
+
+        queryset = queryset.select_related(
             'seller', 'university', 'category'
         ).prefetch_related('reviews')
 
@@ -83,7 +95,15 @@ class ProductListCreateView(generics.ListCreateAPIView):
         university = serializer.validated_data.get('university')
         if not university and hasattr(user, 'profile') and user.profile.university:
             university = user.profile.university
-        serializer.save(seller=user, university=university)
+
+        initial_status = "live" if (user.is_staff or user.is_superuser) else "pending_approval"
+        is_avail = (initial_status == "live")
+        serializer.save(
+            seller=user, 
+            university=university,
+            status=initial_status,
+            is_available=is_avail
+        )
 
 
 

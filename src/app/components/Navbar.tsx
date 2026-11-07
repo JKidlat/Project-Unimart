@@ -24,9 +24,9 @@
  * ==============================================================================
  */
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router';
-import { Search, ShoppingCart, User, Menu, X, Briefcase, ShieldCheck } from 'lucide-react';
+import { Search, ShoppingCart, User, Menu, X, Briefcase, ShieldCheck, Store, ShoppingBag } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useUser } from '../context/UserContext';
 import { useCart } from '../context/CartContext';
@@ -50,28 +50,83 @@ export const Navbar = () => {
     e.preventDefault();
     setSearchQuery(localSearch);
     setIsSearchOpen(false);
-    if (location.pathname !== '/shop') {
+    if (location.pathname !== '/shop' && location.pathname !== '/') {
       navigate('/shop');
     }
   };
 
-  // Primary desktop navigation links
-  const navLinks = [
-    { name: 'Home', path: '/' },
-    { name: 'Shop', path: '/shop' },
-    { name: 'Sell', path: '/sell' },
-    { name: 'Messages', path: '/messages' },
-    { name: 'Help', path: '/help-center' },
-  ];
+  /**
+   * Role-Aware Navigation Links:
+   * - Sellers have the "Sell" button linking directly to their seller studio.
+   * - Buyers DO NOT have the "Sell" button to prevent confusion and maintain a clean shopping flow.
+   * - Guests see Home, Shop, and Help.
+   */
+  const navLinks = useMemo(() => {
+    if (!isLoggedIn) {
+      return [
+        { name: 'Home', path: '/' },
+        { name: 'Shop', path: '/shop' },
+        { name: 'Help', path: '/help-center' },
+      ];
+    }
+
+    if (user?.role === 'Seller') {
+      return [
+        { name: 'Shop', path: '/' },
+        { name: 'Sell', path: '/seller' },
+        { name: 'Messages', path: '/messages' },
+        { name: 'Help', path: '/help-center' },
+      ];
+    }
+
+    // Buyer role (or default authenticated student) - strictly NO "Sell" button
+    return [
+      { name: 'Shop', path: '/' },
+      { name: 'Orders', path: '/orders' },
+      { name: 'Messages', path: '/messages' },
+      { name: 'Help', path: '/help-center' },
+    ];
+  }, [isLoggedIn, user?.role]);
 
   /**
-   * Role badge configuration:
-   * - Sellers get an amber briefcase badge.
-   * - Buyers get a teal user icon badge.
+   * Clear visual identity configuration for user roles:
+   * - Seller: Amber badge with Store icon ("SELLER")
+   * - Buyer: Teal badge with User icon ("BUYER")
+   * - Admin: Crimson badge with ShieldCheck ("ADMIN")
    */
-  const roleBadge = user?.role === 'Seller'
-    ? { bg: 'bg-amber-500', icon: <Briefcase className="w-2.5 h-2.5 text-white" /> }
-    : { bg: 'bg-teal-500', icon: <User className="w-2.5 h-2.5 text-white" /> };
+  const roleConfig = useMemo(() => {
+    const isSeller = user?.role === 'Seller';
+    const isAdmin = user?.role === 'Admin' || user?.is_staff;
+
+    if (isAdmin) {
+      return {
+        label: 'ADMIN',
+        fullLabel: 'Admin Suite',
+        pillBg: 'bg-rose-50 text-rose-700 border-rose-200',
+        dotBg: 'bg-rose-600',
+        icon: <ShieldCheck className="w-2.5 h-2.5 text-white" />
+      };
+    }
+
+    if (isSeller) {
+      return {
+        label: 'SELLER',
+        fullLabel: 'Seller Store',
+        pillBg: 'bg-amber-50 text-amber-800 border-amber-200',
+        dotBg: 'bg-amber-500',
+        icon: <Store className="w-2.5 h-2.5 text-white" />
+      };
+    }
+
+    // Default: Student Buyer
+    return {
+      label: 'BUYER',
+      fullLabel: 'Student Buyer',
+      pillBg: 'bg-teal-50 text-teal-700 border-teal-200',
+      dotBg: 'bg-teal-500',
+      icon: <User className="w-2.5 h-2.5 text-white" />
+    };
+  }, [user?.role, user?.is_staff]);
 
   return (
     <nav className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-[#f3d7db]">
@@ -145,14 +200,12 @@ export const Navbar = () => {
             {isLoggedIn && user ? (
               <Link
                 to="/profile"
-                className="hidden sm:flex items-center space-x-2 p-1 pl-2 border border-gray-100 rounded-full hover:bg-gray-50 transition-all"
+                className="hidden sm:flex items-center space-x-2.5 p-1.5 pl-3 border border-gray-100 rounded-full hover:bg-gray-50 transition-all bg-white shadow-xs"
               >
                 <div className="hidden lg:flex flex-col items-end leading-none">
-                  <span className="text-xs font-bold text-gray-700">{user.name.split(' ')[0]}</span>
-                  <span className={`text-[9px] font-bold uppercase tracking-wide ${
-                    user.role === 'Seller' ? 'text-amber-500' : 'text-teal-500'
-                  }`}>
-                    {user.role}
+                  <span className="text-xs font-bold text-gray-800">{user.name.split(' ')[0]}</span>
+                  <span className={`text-[10px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded border mt-0.5 ${roleConfig.pillBg}`}>
+                    {roleConfig.label}
                   </span>
                 </div>
                 {/* Avatar with role status dot */}
@@ -164,8 +217,8 @@ export const Navbar = () => {
                       user.name[0]
                     )}
                   </div>
-                  <div className={`absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full border-2 border-white flex items-center justify-center ${roleBadge.bg}`}>
-                    {roleBadge.icon}
+                  <div className={`absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full border-2 border-white flex items-center justify-center ${roleConfig.dotBg}`}>
+                    {roleConfig.icon}
                   </div>
                 </div>
               </Link>
@@ -218,25 +271,24 @@ export const Navbar = () => {
                 <Link
                   to="/profile"
                   onClick={() => setIsMenuOpen(false)}
-                  className="flex items-center justify-between px-3 py-3 text-base font-medium text-gray-600 hover:text-[#a14b58] hover:bg-[#fcf6f7] rounded-lg transition-colors"
+                  className="flex items-center justify-between px-3 py-3 text-base font-medium text-gray-600 hover:text-[#a14b58] hover:bg-[#fcf6f7] rounded-xl transition-colors border border-gray-100 my-1 bg-gray-50/50"
                 >
-                  <div className="flex items-center space-x-2">
+                  <div className="flex items-center space-x-2.5">
                     <div className="relative">
-                      <div className="w-8 h-8 rounded-full bg-[#fcf6f7] flex items-center justify-center text-[#a14b58] font-bold border border-[#f3d7db]">
+                      <div className="w-9 h-9 rounded-full bg-[#fcf6f7] flex items-center justify-center text-[#a14b58] font-bold border border-[#f3d7db]">
                         {user.name[0]}
                       </div>
-                      <div className={`absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full border-2 border-white flex items-center justify-center ${roleBadge.bg}`}>
-                        {roleBadge.icon}
+                      <div className={`absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full border-2 border-white flex items-center justify-center ${roleConfig.dotBg}`}>
+                        {roleConfig.icon}
                       </div>
                     </div>
-                    <span>{user.name.split(' ')[0]}</span>
+                    <div>
+                      <span className="font-bold text-gray-800 block text-sm">{user.name.split(' ')[0]}</span>
+                      <span className="text-[10px] text-gray-400 block">{user.university}</span>
+                    </div>
                   </div>
-                  <span className={`text-xs font-bold uppercase tracking-wide px-2 py-0.5 rounded-full ${
-                    user.role === 'Seller'
-                      ? 'bg-amber-100 text-amber-600'
-                      : 'bg-teal-100 text-teal-600'
-                  }`}>
-                    {user.role}
+                  <span className={`text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded border ${roleConfig.pillBg}`}>
+                    {roleConfig.label}
                   </span>
                 </Link>
               ) : (

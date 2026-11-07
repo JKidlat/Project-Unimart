@@ -242,7 +242,7 @@ const PostAdTab: React.FC<{ user: any }> = ({ user }) => {
         seller_email: user.email,
         seller_name: user.name,
       });
-      toast.success('Ad submitted for admin review!');
+      toast.success('Ad submitted for admin review! Once approved, it will be published in the shop.');
       setForm({ title: '', price: '', oldPrice: '', category: '', description: '', condition: 'New' });
       setImages([]);
     } catch (err: any) {
@@ -351,16 +351,18 @@ const PostAdTab: React.FC<{ user: any }> = ({ user }) => {
               required
               value={form.category}
               onChange={e => setForm(p => ({ ...p, category: e.target.value }))}
-              className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-[#a14b58] outline-none appearance-none"
+              className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-[#a14b58] outline-none"
             >
               <option value="">Select Category</option>
+              <option value="groceries">Groceries</option>
+              <option value="stationery">Stationery</option>
               <option value="electronics">Electronics</option>
-              <option value="books">Textbooks</option>
-              <option value="fashion">Fashion & Clothing</option>
-              <option value="home">Hostel Essentials</option>
-              <option value="sports">Sports & Fitness</option>
-              <option value="other">Other</option>
+              <option value="fashion">Fashion</option>
+              <option value="beauty-cosmetics">Beauty and Cosmetics</option>
+              <option value="appliances">Appliances</option>
+              <option value="others">Others</option>
             </select>
+            <p className="text-[11px] text-gray-400">Once approved by an admin, this item will automatically be listed under this category in the shop.</p>
           </div>
           <div className="space-y-1 md:col-span-2">
             <label className="text-sm font-bold text-gray-700">Condition *</label>

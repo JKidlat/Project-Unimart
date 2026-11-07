@@ -30,6 +30,7 @@ import { ImageWithFallback } from './common/ImageWithFallback';
 import { useCart } from '../context/CartContext';
 import { useWishlist } from '../context/WishlistContext';
 import { useUser } from '../context/UserContext';
+import { trackCartInterest, trackWishlistInterest } from '../utils/personalization';
 
 // Product attributes required by this card
 interface Product {
@@ -82,6 +83,7 @@ export const ProductCard = ({ product, requireAuth }: ProductCardProps) => {
         university: product.university || '',
         category: product.category || 'general',
       });
+      trackCartInterest(product.category);
     }
     toast.success(`${product.name} added to cart!`);
   };
@@ -111,6 +113,7 @@ export const ProductCard = ({ product, requireAuth }: ProductCardProps) => {
         rating: product.rating,
         badge: product.badge,
       });
+      trackWishlistInterest(product.category);
       toast.success('Saved to wishlist!');
     }
   };

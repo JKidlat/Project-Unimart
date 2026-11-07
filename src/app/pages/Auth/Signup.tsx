@@ -130,7 +130,7 @@ export const Signup = () => {
       }
 
       toast.success("Account created successfully! Welcome to Unimart.");
-      navigate('/profile');
+      navigate('/');
     } catch (err: any) {
       toast.error(err.message || "Failed to create account. Please try again.");
     } finally {

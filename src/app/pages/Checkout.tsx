@@ -29,6 +29,7 @@ import { useUser } from '../context/UserContext';
 import { universities } from '../data/mockData';
 import { api } from '../../lib/api';
 import { toast } from 'sonner';
+import { trackOrderInterest } from '../utils/personalization';
 
 export const Checkout: React.FC = () => {
   const navigate = useNavigate();
@@ -79,6 +80,8 @@ export const Checkout: React.FC = () => {
         })),
       });
 
+      const purchasedCategories = items.map(i => i.category).filter(Boolean);
+      trackOrderInterest(purchasedCategories);
       clearCart();
       toast.success("Order confirmed successfully!");
       navigate('/order-success');

@@ -40,8 +40,8 @@ class ProductSerializer(serializers.ModelSerializer):
         model = Product
         fields = [
             'id', 'title', 'name', 'description', 'price', 'old_price', 'oldPrice',
-            'condition', 'image', 'product_type', 'is_available', 'category_id',
-            'category_name', 'university_id', 'university_name', 'seller_details',
+            'condition', 'image', 'product_type', 'is_available', 'status', 'rejection_reason',
+            'category_id', 'category_name', 'university_id', 'university_name', 'seller_details',
             'average_rating', 'created_at', 'updated_at'
         ]
         read_only_fields = ['id', 'created_at', 'updated_at']
@@ -95,11 +95,16 @@ class ProductSerializer(serializers.ModelSerializer):
         category_input = self.initial_data.get('category')
         if category_input and not attrs.get('category'):
             alias_map = {
-                'books': 'books-stationery',
-                'textbooks': 'books-stationery',
-                'fashion': 'clothing',
-                'home': 'dorm-essentials',
-                'hostel': 'dorm-essentials',
+                'books': 'stationery',
+                'textbooks': 'stationery',
+                'books-stationery': 'stationery',
+                'clothing': 'fashion',
+                'dorm-essentials': 'appliances',
+                'home': 'appliances',
+                'hostel': 'appliances',
+                'beauty': 'beauty-cosmetics',
+                'beauty-and-cosmetics': 'beauty-cosmetics',
+                'other': 'others',
             }
             slug = str(category_input).strip().lower()
             slug = alias_map.get(slug, slug)

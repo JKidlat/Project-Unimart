@@ -107,8 +107,22 @@ class Command(BaseCommand):
             status = "Created" if created else "Exists"
             self.stdout.write(f"  [University] {status}: {uni.name} ({uni.short_name})")
 
-        # 2. Seed Categories
+        # 2. Seed Categories (7 Official Categories)
         categories_data = [
+            {
+                "name": "Groceries",
+                "slug": "groceries",
+                "icon": "ShoppingCart",
+                "image": "https://images.unsplash.com/photo-1542838132-92c53300491e",
+                "color": "bg-emerald-100",
+            },
+            {
+                "name": "Stationery",
+                "slug": "stationery",
+                "icon": "BookOpen",
+                "image": "https://images.unsplash.com/photo-1654785419449-7f0a9383a4fe",
+                "color": "bg-yellow-100",
+            },
             {
                 "name": "Electronics",
                 "slug": "electronics",
@@ -117,25 +131,32 @@ class Command(BaseCommand):
                 "color": "bg-blue-100",
             },
             {
-                "name": "Dorm Essentials",
-                "slug": "dorm-essentials",
-                "icon": "Lamp",
-                "image": "https://images.unsplash.com/photo-1768077712695-25e3a69b4dc7",
-                "color": "bg-purple-100",
-            },
-            {
-                "name": "Clothing",
-                "slug": "clothing",
+                "name": "Fashion",
+                "slug": "fashion",
                 "icon": "Shirt",
                 "image": "https://images.unsplash.com/photo-1663044022557-7d5d4c1d5318",
                 "color": "bg-pink-100",
             },
             {
-                "name": "Books & Stationery",
-                "slug": "books-stationery",
-                "icon": "BookOpen",
-                "image": "https://images.unsplash.com/photo-1654785419449-7f0a9383a4fe",
-                "color": "bg-yellow-100",
+                "name": "Beauty and Cosmetics",
+                "slug": "beauty-cosmetics",
+                "icon": "Sparkles",
+                "image": "https://images.unsplash.com/photo-1596462502278-27bfdc403348",
+                "color": "bg-rose-100",
+            },
+            {
+                "name": "Appliances",
+                "slug": "appliances",
+                "icon": "Tv",
+                "image": "https://images.unsplash.com/photo-1583847268964-b28dc8f51f92",
+                "color": "bg-orange-100",
+            },
+            {
+                "name": "Others",
+                "slug": "others",
+                "icon": "ShoppingBag",
+                "image": "https://images.unsplash.com/photo-1513542789411-b6a5d4f31634",
+                "color": "bg-purple-100",
             },
         ]
 

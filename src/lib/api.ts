@@ -158,14 +158,44 @@ export const kycStorage = {
 // 4. LOCAL PRODUCTS STORE HELPER
 // ==============================================================================
 
+const CATEGORY_ALIAS_MAP: Record<string, string> = {
+  'books': 'stationery',
+  'textbooks': 'stationery',
+  'books-stationery': 'stationery',
+  'clothing': 'fashion',
+  'dorm-essentials': 'appliances',
+  'home': 'appliances',
+  'hostel': 'appliances',
+  'beauty': 'beauty-cosmetics',
+  'beauty-and-cosmetics': 'beauty-cosmetics',
+  'other': 'others',
+};
+
+export function normalizeCategorySlug(rawCategory: string = ''): string {
+  const clean = String(rawCategory).toLowerCase().trim();
+  return CATEGORY_ALIAS_MAP[clean] || clean;
+}
+
 /**
  * Retrieves all products from localStorage.
- * If storage is empty, it seeds it with mockData.ts initial products.
+ * Normalizes categories and ensures default approval statuses.
  */
 function getLocalProductsStore() {
   try {
     const raw = localStorage.getItem(PRODUCTS_KEY);
-    if (raw) return JSON.parse(raw);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        // Normalize categories and statuses
+        const normalized = parsed.map(p => ({
+          ...p,
+          category: normalizeCategorySlug(p.category || 'others'),
+          status: p.status || 'live',
+          is_available: p.is_available !== undefined ? p.is_available : (p.status !== 'rejected' && p.status !== 'pending_approval'),
+        }));
+        return normalized;
+      }
+    }
   } catch {}
   localStorage.setItem(PRODUCTS_KEY, JSON.stringify(initialProducts));
   return initialProducts;
@@ -254,53 +284,124 @@ async function handleMockFallback(endpoint: string, options: RequestInit = {}): 
     }
   }
 
-  // --- Fallback 4: Products List & Ad Posting ---
+  // --- Fallback 4: Products List, Details, Ad Posting & Approvals ---
   if (endpoint.includes('/products')) {
     const store = getLocalProductsStore();
+
+    // Check for single product detail route: /products/:id/
+    const singleProductMatch = endpoint.match(/\/products\/([^/?]+)\/?$/);
+    const productId = singleProductMatch ? singleProductMatch[1] : null;
+
+    // PATCH /products/:id (Approval / Status update / edit)
+    if (productId && method === 'PATCH') {
+      const updated = store.map((p: any) => {
+        if (String(p.id) === String(productId)) {
+          const nextStatus = body.status !== undefined ? body.status : p.status;
+          return {
+            ...p,
+            ...body,
+            status: nextStatus,
+            is_available: nextStatus === 'live',
+            rejectionReason: body.rejectionReason || body.rejection_reason || p.rejectionReason,
+            updated_at: new Date().toISOString(),
+          };
+        }
+        return p;
+      });
+      localStorage.setItem(PRODUCTS_KEY, JSON.stringify(updated));
+      const target = updated.find((p: any) => String(p.id) === String(productId));
+      return target || { message: 'Updated' };
+    }
+
+    // GET /products/:id (Single product detail)
+    if (productId && method === 'GET') {
+      const found = store.find((p: any) => String(p.id) === String(productId));
+      if (found) return found;
+      return store[0] || null;
+    }
+
+    // POST /products (Seller creates a new ad -> pending_approval)
     if (method === 'POST') {
-      const user = tokenStorage.getUser() || { name: 'Verified Student', university: 'UG - Legon' };
+      const user = tokenStorage.getUser() || { name: 'Verified Student', university: 'UG - Legon', email: 'seller@unimart.local' };
+      const normalizedCategory = normalizeCategorySlug(body.category || 'others');
+      const initialStatus = body.status || 'pending_approval';
+
       const newProduct = {
         id: String(Date.now()),
         name: body.title || body.name,
         title: body.title || body.name,
         price: Number(body.price),
-        oldPrice: body.old_price ? Number(body.old_price) : undefined,
-        category: body.category || 'electronics',
+        oldPrice: body.oldPrice || body.old_price ? Number(body.oldPrice || body.old_price) : undefined,
+        category: normalizedCategory,
+        category_name: normalizedCategory.charAt(0).toUpperCase() + normalizedCategory.slice(1).replace('-', ' '),
         condition: body.condition || 'New',
         image: body.image || 'https://images.unsplash.com/photo-1526738549149-8e07eca6c147',
-        university: user.university || 'University of Ghana (UG)',
+        university: user.university || body.university || 'University of Ghana (UG)',
         description: body.description || '',
-        status: body.status || 'pending_approval',
+        status: initialStatus,
+        is_available: initialStatus === 'live',
+        seller_email: user.email,
         seller: {
+          id: user.id || Date.now(),
           name: user.name || 'Student Seller',
+          email: user.email,
           rating: 5.0,
           verified: true
-        }
+        },
+        created_at: new Date().toISOString(),
       };
       saveLocalProduct(newProduct);
       return newProduct;
     }
 
-    // Filter products by category, university, or search keyword
+    // Filter products by category, university, status, or search keyword
     const url = new URL('http://dummy.com' + endpoint);
     const category = url.searchParams.get('category');
     const uni = url.searchParams.get('university');
     const search = url.searchParams.get('search');
+    const statusParam = url.searchParams.get('status');
+    const sellerEmail = url.searchParams.get('seller_email');
 
     let filtered = [...store];
-    if (category && category !== 'all') {
-      filtered = filtered.filter((p: any) => p.category === category);
+
+    // Status filtering:
+    // If specific status requested (e.g. 'pending_approval', 'live', 'all')
+    if (statusParam && statusParam !== 'all') {
+      filtered = filtered.filter((p: any) => p.status === statusParam);
+    } else if (!statusParam && !sellerEmail) {
+      // Public marketplace request: ONLY show live approved products
+      filtered = filtered.filter((p: any) => p.status === 'live' || !p.status);
     }
-    if (uni && uni !== 'all') {
-      filtered = filtered.filter((p: any) => p.university.includes(uni));
-    }
-    if (search) {
-      const q = search.toLowerCase();
+
+    if (sellerEmail) {
       filtered = filtered.filter((p: any) => 
-        p.name.toLowerCase().includes(q) || 
-        p.description?.toLowerCase().includes(q)
+        p.seller_email === sellerEmail || 
+        p.seller?.email === sellerEmail ||
+        p.seller?.name === sellerEmail
       );
     }
+
+    if (category && category !== 'all') {
+      const normCat = normalizeCategorySlug(category);
+      filtered = filtered.filter((p: any) => normalizeCategorySlug(p.category) === normCat);
+    }
+
+    if (uni && uni !== 'all') {
+      filtered = filtered.filter((p: any) => p.university && p.university.includes(uni));
+    }
+
+    if (search) {
+      const q = search.toLowerCase().trim();
+      filtered = filtered.filter((p: any) => 
+        (p.name && p.name.toLowerCase().includes(q)) || 
+        (p.title && p.title.toLowerCase().includes(q)) || 
+        (p.description && p.description.toLowerCase().includes(q)) ||
+        (p.category && p.category.toLowerCase().includes(q)) ||
+        (p.category_name && p.category_name.toLowerCase().includes(q)) ||
+        (p.seller?.name && p.seller.name.toLowerCase().includes(q))
+      );
+    }
+
     return { results: filtered, count: filtered.length };
   }
 

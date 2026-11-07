@@ -126,9 +126,7 @@ export const CookieConsentBanner: React.FC = () => {
               <div className="flex-1">
                 <h3 className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2">
                   <span>Privacy & Cookie Preferences</span>
-                  <span className="text-[10px] font-semibold uppercase bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 px-2 py-0.5 rounded-full">
-                    Act 843
-                  </span>
+                  
                 </h3>
                 <p className="mt-1.5 text-xs sm:text-sm text-gray-600 dark:text-gray-400 leading-relaxed">
                   Unimart uses strictly necessary cookies for platform security, student session continuity, and core operations. Optional analytics and advertising cookies are only activated with your informed consent.

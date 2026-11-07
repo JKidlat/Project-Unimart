@@ -23,6 +23,7 @@ import { motion } from 'motion/react';
 import { PackagePlus, CheckCircle2, XCircle, Eye } from 'lucide-react';
 import { toast } from 'sonner';
 import { AdminLayout } from './AdminLayout';
+import { api } from '../../../lib/api';
 
 export const AdApprovals: React.FC = () => {
   const [products, setProducts] = useState<any[]>([]);
@@ -31,7 +32,16 @@ export const AdApprovals: React.FC = () => {
   const [processing, setProcessing] = useState(false);
   const [filter, setFilter] = useState<'pending_approval' | 'live' | 'rejected' | 'all'>('pending_approval');
 
-  const load = () => {
+  const load = async () => {
+    try {
+      const res = await api.get('/products/?status=all');
+      const items = res.results || res;
+      if (Array.isArray(items) && items.length > 0) {
+        setProducts(items);
+        return;
+      }
+    } catch {}
+
     try {
       const stored = JSON.parse(localStorage.getItem('unimart_products_store') || '[]');
       setProducts(stored);
@@ -40,36 +50,48 @@ export const AdApprovals: React.FC = () => {
 
   useEffect(() => { load(); }, []);
 
-  const approve = (product: any) => {
+  const approve = async (product: any) => {
     setProcessing(true);
+    try {
+      await api.patch(`/products/${product.id}/`, { status: 'live', is_available: true });
+    } catch {}
+
     const stored = JSON.parse(localStorage.getItem('unimart_products_store') || '[]');
     const updated = stored.map((p: any) =>
       String(p.id) === String(product.id) ? { ...p, status: 'live', is_available: true } : p
     );
     localStorage.setItem('unimart_products_store', JSON.stringify(updated));
-    toast.success(`"${product.name || product.title}" is now live!`);
+    toast.success(`"${product.name || product.title}" is now approved and live in the shop!`);
     setSelected(null);
-    load();
+    await load();
     setProcessing(false);
   };
 
-  const reject = (product: any) => {
+  const reject = async (product: any) => {
     if (!rejectionReason.trim()) {
       toast.error('Please provide a rejection reason.');
       return;
     }
     setProcessing(true);
+    try {
+      await api.patch(`/products/${product.id}/`, {
+        status: 'rejected',
+        is_available: false,
+        rejectionReason: rejectionReason.trim(),
+      });
+    } catch {}
+
     const stored = JSON.parse(localStorage.getItem('unimart_products_store') || '[]');
     const updated = stored.map((p: any) =>
       String(p.id) === String(product.id)
-        ? { ...p, status: 'rejected', is_available: false, rejectionReason }
+        ? { ...p, status: 'rejected', is_available: false, rejectionReason: rejectionReason.trim() }
         : p
     );
     localStorage.setItem('unimart_products_store', JSON.stringify(updated));
-    toast.success('Ad rejected.');
+    toast.success('Ad rejected with feedback saved for seller.');
     setRejectionReason('');
     setSelected(null);
-    load();
+    await load();
     setProcessing(false);
   };
 

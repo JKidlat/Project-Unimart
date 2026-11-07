@@ -64,10 +64,13 @@ export const Sell = () => {
         condition: formData.condition,
         description: formData.description,
         image: 'https://images.unsplash.com/photo-1526738549149-8e07eca6c147',
+        status: 'pending_approval',
+        seller_email: user.email,
+        seller_name: user.name,
       });
 
-      toast.success("Item posted live on Unimart!");
-      navigate('/shop');
+      toast.success("Ad submitted for review! Once approved by an admin, it will be published in the shop.");
+      navigate('/seller');
     } catch (err: any) {
       toast.error(err.message || "Failed to post item");
     } finally {
@@ -201,10 +204,13 @@ export const Sell = () => {
                 onChange={(e) => setFormData({...formData, category: e.target.value})}
               >
                 <option value="">Select Category</option>
+                <option value="groceries">Groceries</option>
+                <option value="stationery">Stationery</option>
                 <option value="electronics">Electronics</option>
-                <option value="dorm-essentials">Dorm Essentials</option>
-                <option value="clothing">Clothing & Fashion</option>
-                <option value="books-stationery">Books & Stationery</option>
+                <option value="fashion">Fashion</option>
+                <option value="beauty-cosmetics">Beauty and Cosmetics</option>
+                <option value="appliances">Appliances</option>
+                <option value="others">Others</option>
               </select>
             </div>
             <div className="space-y-2">

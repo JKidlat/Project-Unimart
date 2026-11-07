@@ -38,6 +38,12 @@ class Product(models.Model):
         ("Fair", "Fair"),
     ]
 
+    STATUS_CHOICES = [
+        ("pending_approval", "Pending Review"),
+        ("live", "Live / Approved"),
+        ("rejected", "Rejected"),
+    ]
+
     seller = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
@@ -90,9 +96,21 @@ class Product(models.Model):
         help_text="Primary image URL"
     )
 
+    status = models.CharField(
+        max_length=30,
+        choices=STATUS_CHOICES,
+        default="pending_approval",
+        help_text="Administrative approval status"
+    )
+    rejection_reason = models.TextField(
+        blank=True,
+        null=True,
+        help_text="Feedback provided by administrator if rejected"
+    )
+
     is_available = models.BooleanField(
-        default=True,
-        help_text="Whether the product is currently available"
+        default=False,
+        help_text="Whether the product is currently available in the shop"
     )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

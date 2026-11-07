@@ -66,15 +66,12 @@ export const Signin = () => {
         toast.success("Welcome back to Unimart!");
       }
 
-      // Role-based routing: Admin -> /admin, Seller -> /seller, Buyer -> / or returnTo
+      // Role-based routing: Admin -> /admin, Buyers & Sellers -> Shop (/) or returnTo
       const user = JSON.parse(localStorage.getItem('unimart_user_session') || 'null');
       const role = user?.role || user?.is_staff ? (user?.is_staff ? 'Admin' : user?.role) : 'Buyer';
       
       if (role === 'Admin' || user?.is_staff) {
         navigate('/admin');
-      } else if (role === 'Seller') {
-        const returnTo = (location.state as any)?.returnTo;
-        navigate(returnTo || '/seller');
       } else {
         const returnTo = (location.state as any)?.returnTo;
         navigate(returnTo || '/');
