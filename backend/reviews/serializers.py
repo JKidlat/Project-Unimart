@@ -24,16 +24,14 @@ class ReviewSerializer(serializers.ModelSerializer):
     2. Rating is between 1-5
     3. No duplicate review exists (enforced by model unique_together)
     """
-    user = serializers.StringRelatedField(read_only=True)
-    user_email = serializers.EmailField(source='user.email', read_only=True)
+    reviewer_name = serializers.SerializerMethodField(read_only=True)
     product_title = serializers.CharField(source='product.title', read_only=True)
 
     class Meta:
         model = Review
         fields = [
             'id',
-            'user',
-            'user_email',
+            'reviewer_name',
             'product',
             'product_title',
             'rating',
@@ -41,7 +39,16 @@ class ReviewSerializer(serializers.ModelSerializer):
             'created_at',
             'updated_at'
         ]
-        read_only_fields = ['id', 'user', 'user_email', 'product_title', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'reviewer_name', 'product_title', 'created_at', 'updated_at']
+
+    def get_reviewer_name(self, obj):
+        name = obj.user.full_name
+        if name:
+            parts = name.strip().split()
+            if len(parts) > 1:
+                return f"{parts[0]} {parts[1][0]}."
+            return parts[0]
+        return "Verified Student"
 
     def validate_rating(self, value):
         """
@@ -88,8 +95,7 @@ class ReviewSerializer(serializers.ModelSerializer):
 
 
 class ReviewListSerializer(serializers.ModelSerializer):
-    user_name = serializers.CharField(source='user.full_name', read_only=True, default='')
-    user_email = serializers.EmailField(source='user.email', read_only=True)
+    user_name = serializers.SerializerMethodField(read_only=True)
     product_title = serializers.CharField(source='product.title', read_only=True)
     product_id = serializers.IntegerField(source='product.id', read_only=True)
 
@@ -98,7 +104,6 @@ class ReviewListSerializer(serializers.ModelSerializer):
         fields = [
             'id',
             'user_name',
-            'user_email',
             'product_id',
             'product_title',
             'rating',
@@ -107,3 +112,12 @@ class ReviewListSerializer(serializers.ModelSerializer):
             'updated_at'
         ]
         read_only_fields = fields
+
+    def get_user_name(self, obj):
+        name = obj.user.full_name
+        if name:
+            parts = name.strip().split()
+            if len(parts) > 1:
+                return f"{parts[0]} {parts[1][0]}."
+            return parts[0]
+        return "Verified Student"

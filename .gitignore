@@ -3,26 +3,36 @@ __pycache__/
 *.py[cod]
 *$py.class
 
-# Django
-*.log
-local_settings.py
+# Environment Variables
+.env
+.env.*
+!.env.example
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Database
+*.sqlite3
+*.sqlite3-journal
+*.sqlite3.bak
 db.sqlite3
-db.sqlite3-journal
+db.sqlite3.bak
+
+# Certificates and Secrets
+*.pem
+*.key
+*.cert
+*.p12
+serviceAccountKey*.json
+firebase-credentials*.json
+firebase-credentials.json
 
 # Virtual Environment
 venv/
 env/
 ENV/
 .venv/
-
-# Environment Variables
-.env
-.env.local
-
-# IDEs
-.idea/
-.vscode/
-*.swp
 
 # Node / Build
 node_modules/
@@ -31,6 +41,9 @@ dist/
 build/
 *.bak
 
-# Firebase / Credentials
-firebase-credentials.json
+# IDEs
+.idea/
+.vscode/
+*.swp
+*.log
 

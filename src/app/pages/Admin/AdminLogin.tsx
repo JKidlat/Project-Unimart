@@ -55,31 +55,43 @@ export const AdminLogin: React.FC = () => {
     setErrorMessage(null);
 
     try {
-      // Authenticate strictly against authorized admin credentials
-      const authResult = authenticateAdminCredentials(formData.email, formData.password);
+      // 1. Prioritize authentic server-side Django JWT authentication
+      try {
+        await login({ email: formData.email, password: formData.password });
+        const sessionUser = JSON.parse(localStorage.getItem('unimart_user_session') || '{}');
+        if (sessionUser?.is_staff || sessionUser?.role === 'Admin') {
+          toast.success(`Welcome back, ${sessionUser.name || 'Admin'}! Access granted.`);
+          navigate('/admin');
+          return;
+        } else if (sessionUser?.email) {
+          throw new Error('Access denied. This account does not possess administrator credentials.');
+        }
+      } catch (backendErr: any) {
+        // If server explicitly denied credentials due to not being staff, rethrow
+        if (backendErr.message?.includes('Access denied')) {
+          throw backendErr;
+        }
 
-      if (!authResult.success || !authResult.admin) {
-        setErrorMessage(authResult.error || 'Authentication failed');
-        toast.error(authResult.error || 'Access denied');
-        setIsLoading(false);
-        return;
+        // 2. Offline / local development fallback verification
+        const authResult = authenticateAdminCredentials(formData.email, formData.password);
+        if (authResult.success && authResult.admin) {
+          await login({
+            id: authResult.admin.id,
+            name: authResult.admin.name,
+            email: authResult.admin.email,
+            university: 'Unimart Headquarters (Admin)',
+            role: 'Admin',
+            profilePic: null,
+            joinDate: authResult.admin.createdAt,
+            referralCode: 'UNIM-CREATOR-001',
+            is_staff: true,
+          });
+          toast.success(`Welcome back, ${authResult.admin.name}! Access granted.`);
+          navigate('/admin');
+          return;
+        }
+        throw new Error(backendErr.message || authResult.error || 'Invalid administrator credentials');
       }
-
-      // Log in user via UserContext
-      await login({
-        id: authResult.admin.id,
-        name: authResult.admin.name,
-        email: authResult.admin.email,
-        university: 'Unimart Headquarters (Admin)',
-        role: 'Admin',
-        profilePic: null,
-        joinDate: authResult.admin.createdAt,
-        referralCode: 'UNIM-CREATOR-001',
-        is_staff: true,
-      });
-
-      toast.success(`Welcome back, ${authResult.admin.name}! Access granted to Creator Suite.`);
-      navigate('/admin');
     } catch (err: any) {
       toast.error(err.message || 'Failed to authenticate admin credentials');
       setErrorMessage(err.message || 'Failed to authenticate');

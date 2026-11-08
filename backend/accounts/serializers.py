@@ -90,10 +90,10 @@ class ProfileUpdateSerializer(serializers.Serializer):
 class RegisterSerializer(serializers.Serializer):
     """
     Serializer for user registration.
-    Supports standard email/password registration with optional Firebase token integration.
+    Enforces strong password validation, email normalization, and role constraints.
     """
     email = serializers.EmailField(required=True)
-    password = serializers.CharField(write_only=True, required=True, min_length=6)
+    password = serializers.CharField(write_only=True, required=True, min_length=8)
     full_name = serializers.CharField(required=False, allow_blank=True, default='')
     phone_number = serializers.CharField(required=False, allow_blank=True, default='')
     university_id = serializers.IntegerField(required=False, allow_null=True, default=None)
@@ -101,6 +101,21 @@ class RegisterSerializer(serializers.Serializer):
     role = serializers.CharField(required=False, default='Buyer')
     referral_code = serializers.CharField(required=False, allow_blank=True, default='')
 
+    def validate_password(self, value):
+        from django.contrib.auth.password_validation import validate_password
+        from django.core.exceptions import ValidationError as DjangoValidationError
+        try:
+            validate_password(value)
+        except DjangoValidationError as e:
+            raise serializers.ValidationError(list(e.messages))
+        return value
+
+    def validate_role(self, value):
+        clean = str(value).strip().title()
+        # Prevent privilege escalation during registration
+        if clean not in ['Buyer', 'Seller']:
+            return 'Buyer'
+        return clean
 
     def validate_email(self, value):
         normalized = value.strip().lower()
@@ -171,4 +186,4 @@ class KYCSubmissionSerializer(serializers.ModelSerializer):
             'selfieBase64', 'idDocBase64', 'mode', 'status', 'rejectionReason',
             'submittedAt', 'reviewedAt'
         ]
-        read_only_fields = ['id', 'user_email', 'user_name', 'submittedAt', 'reviewedAt']
+        read_only_fields = ['id', 'user_email', 'user_name', 'status', 'submittedAt', 'reviewedAt']

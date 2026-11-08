@@ -23,13 +23,13 @@ import { getAuth } from "firebase/auth";
 
 // Public credentials identifying the Unimart project in Google Firebase
 const firebaseConfig = {
-  apiKey: "AIzaSyDZ85fsuPtlFN6bUgbjvuTiUwxTMS8Z6wE",
-  authDomain: "unimart-c4308.firebaseapp.com",
-  projectId: "unimart-c4308",
-  storageBucket: "unimart-c4308.firebasestorage.app",
-  messagingSenderId: "911425195338",
-  appId: "1:911425195338:web:8e511f03eebe3da6e045b3",
-  measurementId: "G-0X9K13CQZ3"
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyDZ85fsuPtlFN6bUgbjvuTiUwxTMS8Z6wE",
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "unimart-c4308.firebaseapp.com",
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "unimart-c4308",
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "unimart-c4308.firebasestorage.app",
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "911425195338",
+  appId: import.meta.env.VITE_FIREBASE_APP_ID || "1:911425195338:web:8e511f03eebe3da6e045b3",
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || "G-0X9K13CQZ3"
 };
 
 // Initialize the Firebase App instance

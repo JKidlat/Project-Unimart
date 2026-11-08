@@ -44,17 +44,21 @@ class ProductSerializer(serializers.ModelSerializer):
             'category_id', 'category_name', 'university_id', 'university_name', 'seller_details',
             'average_rating', 'created_at', 'updated_at'
         ]
-        read_only_fields = ['id', 'created_at', 'updated_at']
+        read_only_fields = [
+            'id', 'created_at', 'updated_at', 'status', 'is_available', 'rejection_reason'
+        ]
 
     def get_average_rating(self, obj):
         return obj.average_rating
 
     def get_seller_details(self, obj):
         seller = obj.seller
+        profile = getattr(seller, 'profile', None)
+        uni_name = profile.university.short_name if (profile and profile.university) else ''
         return {
             'id': seller.id,
-            'name': seller.full_name or seller.email.split('@')[0],
-            'email': seller.email,
+            'name': seller.full_name or "Verified Student",
+            'university': uni_name,
             'rating': obj.average_rating,
             'verified': getattr(seller, 'is_verified_student', True)
         }

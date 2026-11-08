@@ -45,13 +45,11 @@ class FirebaseAuthentication(authentication.BaseAuthentication):
             decoded_token = auth.verify_id_token(id_token, clock_skew_seconds=60)
             uid = decoded_token.get("uid")
             email = decoded_token.get("email")
-        except Exception as e:
-            print(f"FIREBASE AUTH EXCEPTION: {str(e)}")
-            raise exceptions.AuthenticationFailed(f"Firebase auth error: {str(e)}")
+        except Exception:
+            raise exceptions.AuthenticationFailed("Invalid authentication token or token expired.")
             
         if not uid or not email:
-            print("FIREBASE AUTH: Missing UID or Email")
-            raise exceptions.AuthenticationFailed("Firebase token missing UID or email.")
+            raise exceptions.AuthenticationFailed("Firebase token missing identifier claims.")
             
         from accounts.models import Profile
         user, created = User.objects.get_or_create(email=email)

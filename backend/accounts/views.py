@@ -38,18 +38,21 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
 class LoginView(TokenObtainPairView):
     """
     Login endpoint that issues JWT tokens and returns the authenticated user profile.
+    Protected by 'auth' rate limiting to mitigate brute-force attempts.
     """
     serializer_class = CustomTokenObtainPairSerializer
-
+    throttle_scope = 'auth'
 
 
 class RegisterView(generics.CreateAPIView):
     """
     Register a new user account and return JWT tokens + profile data.
+    Protected by 'auth' rate limiting.
     """
     queryset = User.objects.all()
     serializer_class = RegisterSerializer
     permission_classes = [AllowAny]
+    throttle_scope = 'auth'
 
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
@@ -164,8 +167,8 @@ class KYCSubmissionView(generics.ListCreateAPIView):
 
     def perform_create(self, serializer):
         user = self.request.user
-        email = serializer.validated_data.get('email') or user.email
-        serializer.save(user=user, email=email, status='pending')
+        # Strict user-binding: always bind KYC to authenticated user's email
+        serializer.save(user=user, email=user.email, status='pending')
 
 
 class KYCDetailView(generics.RetrieveUpdateAPIView):

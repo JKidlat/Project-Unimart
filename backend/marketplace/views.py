@@ -110,14 +110,44 @@ class ProductListCreateView(generics.ListCreateAPIView):
 class ProductDetailView(generics.RetrieveUpdateDestroyAPIView):
     """
     Retrieve, update, or delete a product.
+    Only allows public access to approved live products; pending/rejected
+    listings are strictly restricted to the listing seller or platform staff.
     """
-    queryset = Product.objects.all().select_related('seller', 'university', 'category').prefetch_related('reviews')
     serializer_class = ProductSerializer
+
+    def get_queryset(self):
+        user = self.request.user
+        base_qs = Product.objects.select_related('seller', 'university', 'category').prefetch_related('reviews')
+        if user.is_authenticated and (user.is_staff or user.is_superuser):
+            return base_qs
+        elif user.is_authenticated:
+            return base_qs.filter(Q(status='live', is_available=True) | Q(seller=user))
+        return base_qs.filter(status='live', is_available=True)
 
     def get_permissions(self):
         if self.request.method in ['PUT', 'PATCH', 'DELETE']:
             return [permissions.IsAuthenticated(), IsOwnerOrReadOnly()]
         return [permissions.AllowAny()]
+
+    def perform_update(self, serializer):
+        user = self.request.user
+        if user.is_staff or user.is_superuser:
+            # Administrators can approve, reject, or toggle availability
+            status_val = self.request.data.get('status')
+            is_avail_val = self.request.data.get('is_available')
+            rejection_reason_val = self.request.data.get('rejection_reason') or self.request.data.get('rejectionReason')
+            kwargs = {}
+            if status_val in ['pending_approval', 'live', 'rejected']:
+                kwargs['status'] = status_val
+            if is_avail_val is not None:
+                kwargs['is_available'] = bool(is_avail_val)
+            if rejection_reason_val is not None:
+                kwargs['rejection_reason'] = rejection_reason_val
+            serializer.save(**kwargs)
+        else:
+            # Regular sellers updating listing details:
+            # Must not self-approve; listing is returned to pending review
+            serializer.save(status='pending_approval', is_available=False)
 
 
 class WishlistView(generics.ListCreateAPIView):

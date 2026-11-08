@@ -13,9 +13,11 @@ from orders.models import Order
 class VerifyPaymentView(APIView):
     """
     Verifies a Paystack payment reference and updates the associated order status.
-    Performs server-to-server validation against Paystack API when secret key is configured.
+    Performs server-to-server validation against Paystack API with amount and currency checks.
+    Protected by 'payments' rate limiting.
     """
     permission_classes = [permissions.IsAuthenticated]
+    throttle_scope = 'payments'
 
     def post(self, request):
         reference = request.data.get('reference')
@@ -52,8 +54,24 @@ class VerifyPaymentView(APIView):
                 with urllib.request.urlopen(req, timeout=10) as response:
                     res_body = json.loads(response.read().decode('utf-8'))
                     if res_body.get('status') and res_body.get('data', {}).get('status') == 'success':
+                        t_data = res_body['data']
+                        currency = t_data.get('currency', '').upper()
+                        paid_pesewas = t_data.get('amount', 0)
+
+                        if currency != 'GHS':
+                            return Response({
+                                'error': f'Invalid transaction currency: expected GHS, received {currency}'
+                            }, status=status.HTTP_400_BAD_REQUEST)
+
+                        if order:
+                            expected_pesewas = int(round(float(order.total_amount) * 100))
+                            if paid_pesewas < expected_pesewas:
+                                return Response({
+                                    'error': 'Paid amount does not match required order total amount.'
+                                }, status=status.HTTP_400_BAD_REQUEST)
+
                         payment_verified = True
-                        channel = res_body['data'].get('channel', 'paystack')
+                        channel = t_data.get('channel', 'paystack')
                     else:
                         return Response({
                             'error': 'Payment verification failed at Paystack',

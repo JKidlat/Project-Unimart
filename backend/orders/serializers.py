@@ -62,15 +62,19 @@ class OrderSerializer(serializers.ModelSerializer):
             'created_at',
             'updated_at',
         ]
-        read_only_fields = ['id', 'buyer_email', 'total_amount', 'created_at', 'updated_at', 'items']
+        read_only_fields = ['id', 'buyer_email', 'total_amount', 'status', 'created_at', 'updated_at', 'items']
 
     @transaction.atomic
     def create(self, validated_data):
         cart_items_data = validated_data.pop('cart_items', [])
         user = self.context['request'].user
 
+        # Prevent manipulation of initial status - orders always start as pending
+        validated_data.pop('status', None)
+
         order = Order.objects.create(
             buyer=user,
+            status='pending',
             **validated_data
         )
 
@@ -104,3 +108,34 @@ class OrderStatusUpdateSerializer(serializers.ModelSerializer):
         model = Order
         fields = ['id', 'status', 'updated_at']
         read_only_fields = ['id', 'updated_at']
+
+    def validate_status(self, value):
+        request = self.context.get('request')
+        user = getattr(request, 'user', None)
+        order = self.instance
+
+        if not user or not order:
+            return value
+
+        # Admins can set any valid order status
+        if user.is_staff or user.is_superuser:
+            return value
+
+        # Check user relationship to this order
+        is_seller = order.items.filter(seller=user).exists()
+        is_buyer = (order.buyer == user)
+
+        if is_seller:
+            # Sellers can advance fulfillment
+            allowed_seller_transitions = ['shipped', 'completed', 'cancelled']
+            if value not in allowed_seller_transitions:
+                raise serializers.ValidationError(f"Sellers can only set status to: {', '.join(allowed_seller_transitions)}.")
+            return value
+
+        if is_buyer:
+            # Buyers can only cancel a pending order
+            if value == 'cancelled' and order.status == 'pending':
+                return value
+            raise serializers.ValidationError("Buyers cannot modify fulfillment status. You may only cancel an order while it is still pending.")
+
+        raise serializers.ValidationError("You do not have permission to update this order's status.")
