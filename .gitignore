@@ -41,6 +41,8 @@ node_modules/
 frontend/node_modules/
 dist/
 build/
+staticfiles/
+backend/staticfiles/
 *.bak
 
 # IDEs
