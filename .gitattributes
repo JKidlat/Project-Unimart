@@ -1,3 +1,4 @@
 # Enforce LF endings for shell scripts and Linux configuration
 *.sh text eol=lf
 runtime.txt text eol=lf
+

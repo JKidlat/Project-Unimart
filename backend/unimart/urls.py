@@ -60,7 +60,6 @@ def api_root(request):
         "message": "Welcome to UNIMART REST API",
         "version": "1.0",
         "endpoints": {
-            "health": request.build_absolute_uri('/api/health/'),
             "admin": request.build_absolute_uri('/admin/'),
             "auth": {
                 "register": request.build_absolute_uri('/api/auth/register/'),
@@ -86,8 +85,6 @@ def api_root(request):
 
 
 urlpatterns = [
-    path('health/', health_check, name='health_check'),
-    path('api/health/', health_check, name='api_health_check'),
     path('', api_root, name='root'),
     path('api/', api_root, name='api-root'),
     path('admin/', admin.site.urls),
