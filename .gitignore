@@ -18,6 +18,8 @@ __pycache__/
 *.sqlite3.bak
 db.sqlite3
 db.sqlite3.bak
+backups/
+backend/backups/
 
 # Certificates and Secrets
 *.pem
@@ -39,6 +41,8 @@ node_modules/
 frontend/node_modules/
 dist/
 build/
+staticfiles/
+backend/staticfiles/
 *.bak
 
 # IDEs

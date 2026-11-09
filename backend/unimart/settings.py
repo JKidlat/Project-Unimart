@@ -35,7 +35,13 @@ if not SECRET_KEY:
         raise ImproperlyConfigured("The SECRET_KEY environment variable must be set in production.")
 
 raw_hosts = os.environ.get('ALLOWED_HOSTS', '')
-ALLOWED_HOSTS = [h.strip() for h in raw_hosts.split(',') if h.strip()] or (['*'] if DEBUG else [])
+ALLOWED_HOSTS = [h.strip() for h in raw_hosts.split(',') if h.strip()] or (['*'] if DEBUG else ['localhost', '127.0.0.1', '.onrender.com'])
+if 'testserver' not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS.append('testserver')
+if 'localhost' not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS.append('localhost')
+if '127.0.0.1' not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS.append('127.0.0.1')
 
 
 # Application definition
@@ -67,6 +73,7 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -165,6 +172,7 @@ USE_TZ = True
 
 STATIC_URL = 'static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 # Media files
 MEDIA_URL = '/media/'
@@ -186,6 +194,7 @@ elif not CORS_ALLOW_ALL_ORIGINS:
         "http://localhost:5173",
         "http://localhost:3000",
         "http://127.0.0.1:5173",
+        "https://project-unimart.vercel.app",
     ]
 
 csrf_env = os.environ.get('CSRF_TRUSTED_ORIGINS', '')
@@ -195,6 +204,7 @@ elif not DEBUG:
     CSRF_TRUSTED_ORIGINS = [
         "http://localhost:5173",
         "http://localhost:3000",
+        "https://project-unimart.vercel.app",
     ]
 
 CORS_ALLOW_CREDENTIALS = True

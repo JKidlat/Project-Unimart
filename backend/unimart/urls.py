@@ -27,6 +27,31 @@ from accounts import views as accounts_views
 
 @api_view(['GET'])
 @permission_classes([AllowAny])
+def health_check(request):
+    """
+    Health check endpoint for Render uptime monitoring.
+    Verifies that the WSGI worker and Supabase database connection are operational.
+    """
+    from django.db import connection
+    db_status = "connected"
+    try:
+        connection.ensure_connection()
+    except Exception as e:
+        return Response({
+            "status": "degraded",
+            "service": "unimart-backend",
+            "database": f"error: {str(e)}"
+        }, status=503)
+
+    return Response({
+        "status": "healthy",
+        "service": "unimart-backend",
+        "database": db_status
+    })
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
 def api_root(request):
     """
     Root API view providing a directory of all available UNIMART endpoints.
@@ -35,6 +60,7 @@ def api_root(request):
         "message": "Welcome to UNIMART REST API",
         "version": "1.0",
         "endpoints": {
+            "health": request.build_absolute_uri('/api/health/'),
             "admin": request.build_absolute_uri('/admin/'),
             "auth": {
                 "register": request.build_absolute_uri('/api/auth/register/'),
@@ -60,6 +86,8 @@ def api_root(request):
 
 
 urlpatterns = [
+    path('health/', health_check, name='health_check'),
+    path('api/health/', health_check, name='api_health_check'),
     path('', api_root, name='root'),
     path('api/', api_root, name='api-root'),
     path('admin/', admin.site.urls),
