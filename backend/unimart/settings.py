@@ -35,7 +35,13 @@ if not SECRET_KEY:
         raise ImproperlyConfigured("The SECRET_KEY environment variable must be set in production.")
 
 raw_hosts = os.environ.get('ALLOWED_HOSTS', '')
-ALLOWED_HOSTS = [h.strip() for h in raw_hosts.split(',') if h.strip()] or (['*'] if DEBUG else [])
+ALLOWED_HOSTS = [h.strip() for h in raw_hosts.split(',') if h.strip()] or (['*'] if DEBUG else ['localhost', '127.0.0.1', '.onrender.com'])
+if 'testserver' not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS.append('testserver')
+if 'localhost' not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS.append('localhost')
+if '127.0.0.1' not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS.append('127.0.0.1')
 
 
 # Application definition

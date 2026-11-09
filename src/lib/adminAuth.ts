@@ -39,18 +39,30 @@ const ADMIN_STORAGE_KEY = 'unimart_authorized_admins';
 
 // Master administrator constants
 export const MASTER_ADMIN_EMAIL = 'jansah.klintaps@gmail.com';
+export const CO_ADMIN_EMAIL = 'abrahamkwesijames@gmail.com';
 export const DEFAULT_ADMIN_PASSWORD = 'unimartadmin1234';
 
-// Seed account for the platform creator
-const DEFAULT_ADMIN: AdminAccount = {
-  id: 'admin-master',
-  name: 'Super Admin',
-  email: MASTER_ADMIN_EMAIL,
-  password: DEFAULT_ADMIN_PASSWORD,
-  role: 'Super Admin',
-  isMaster: true,
-  createdAt: '2024-01-01',
-};
+// Seed accounts for platform administrators
+const INITIAL_ADMINS: AdminAccount[] = [
+  {
+    id: 'admin-master',
+    name: 'Jay Kidlat',
+    email: MASTER_ADMIN_EMAIL,
+    password: DEFAULT_ADMIN_PASSWORD,
+    role: 'Super Admin',
+    isMaster: true,
+    createdAt: '2024-01-01',
+  },
+  {
+    id: 'admin-co-founder',
+    name: 'Abraham Kwesi James',
+    email: CO_ADMIN_EMAIL,
+    password: DEFAULT_ADMIN_PASSWORD,
+    role: 'Super Admin',
+    isMaster: true,
+    createdAt: '2024-01-01',
+  },
+];
 
 // ==============================================================================
 // 1. PASSWORD GENERATOR
@@ -87,12 +99,14 @@ export function getAuthorizedAdmins(): AdminAccount[] {
     if (raw) {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed) && parsed.length > 0) {
-        // Guarantee master admin is always present
-        const hasMaster = parsed.some(a => a.email.toLowerCase() === MASTER_ADMIN_EMAIL.toLowerCase());
-        if (!hasMaster) {
-          parsed.unshift(DEFAULT_ADMIN);
-          localStorage.setItem(ADMIN_STORAGE_KEY, JSON.stringify(parsed));
+        // Guarantee both seed administrators are always present
+        for (const initial of INITIAL_ADMINS) {
+          const exists = parsed.some(a => a.email.toLowerCase() === initial.email.toLowerCase());
+          if (!exists) {
+            parsed.push(initial);
+          }
         }
+        localStorage.setItem(ADMIN_STORAGE_KEY, JSON.stringify(parsed));
         return parsed;
       }
     }
@@ -100,8 +114,8 @@ export function getAuthorizedAdmins(): AdminAccount[] {
     console.error('Failed to parse admins from storage:', err);
   }
 
-  // Seed default admin if storage is empty
-  const initial = [DEFAULT_ADMIN];
+  // Seed default admins if storage is empty
+  const initial = [...INITIAL_ADMINS];
   localStorage.setItem(ADMIN_STORAGE_KEY, JSON.stringify(initial));
   return initial;
 }

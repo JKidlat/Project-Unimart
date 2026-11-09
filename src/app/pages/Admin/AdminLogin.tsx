@@ -29,6 +29,7 @@ import { toast } from 'sonner';
 import { 
   authenticateAdminCredentials, 
   MASTER_ADMIN_EMAIL, 
+  CO_ADMIN_EMAIL,
   DEFAULT_ADMIN_PASSWORD,
   getAuthorizedAdmins
 } from '../../../lib/adminAuth';
@@ -106,7 +107,16 @@ export const AdminLogin: React.FC = () => {
       password: DEFAULT_ADMIN_PASSWORD,
     });
     setErrorMessage(null);
-    toast.info('Master Creator credentials populated.');
+    toast.info('Primary Creator credentials populated.');
+  };
+
+  const handleQuickFillCoAdmin = () => {
+    setFormData({
+      email: CO_ADMIN_EMAIL,
+      password: DEFAULT_ADMIN_PASSWORD,
+    });
+    setErrorMessage(null);
+    toast.info('Co-Admin credentials populated.');
   };
 
   return (
@@ -136,9 +146,10 @@ export const AdminLogin: React.FC = () => {
         {/* Authorized Access Notice */}
         <div className="mb-5 p-3 rounded-xl bg-white/5 border border-white/10 text-[11px] text-white/70 flex items-start gap-2">
           <Info className="w-4 h-4 text-[#f3d7db] shrink-0 mt-0.5" />
-          <div>
-            <p className="font-bold text-white">Primary Creator Account:</p>
+          <div className="space-y-0.5">
+            <p className="font-bold text-white">Authorized Creator Accounts:</p>
             <p className="font-mono text-[#f3d7db]">{MASTER_ADMIN_EMAIL}</p>
+            <p className="font-mono text-[#f3d7db]">{CO_ADMIN_EMAIL}</p>
           </div>
         </div>
 
@@ -195,7 +206,7 @@ export const AdminLogin: React.FC = () => {
           </button>
         </form>
 
-        <div className="mt-6 pt-5 border-t border-white/10 space-y-3">
+        <div className="mt-6 pt-5 border-t border-white/10 space-y-2.5">
           <button
             type="button"
             onClick={handleQuickFillMaster}
@@ -203,7 +214,17 @@ export const AdminLogin: React.FC = () => {
             className="w-full py-2.5 bg-white/10 hover:bg-white/15 border border-white/20 text-white rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2"
           >
             <Sparkles className="w-3.5 h-3.5 text-amber-300" />
-            Quick Fill: Primary Admin Credentials
+            Quick Fill: jansah.klintaps@gmail.com
+          </button>
+
+          <button
+            type="button"
+            onClick={handleQuickFillCoAdmin}
+            disabled={isLoading}
+            className="w-full py-2.5 bg-white/10 hover:bg-white/15 border border-white/20 text-white rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2"
+          >
+            <Sparkles className="w-3.5 h-3.5 text-rose-300" />
+            Quick Fill: abrahamkwesijames@gmail.com
           </button>
 
           <div className="text-center">
