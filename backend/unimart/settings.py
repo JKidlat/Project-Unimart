@@ -105,21 +105,21 @@ import urllib.parse
 database_url = os.environ.get('DATABASE_URL')
 if database_url and not database_url.startswith('sqlite'):
     url = urllib.parse.urlparse(database_url)
+    query_params = urllib.parse.parse_qs(url.query)
+    ssl_mode = query_params.get('sslmode', ['require'])[0]
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.postgresql',
-            'NAME': url.path[1:],
-            'USER': url.username,
-            'PASSWORD': url.password,
+            'NAME': urllib.parse.unquote(url.path[1:]) if url.path else 'postgres',
+            'USER': urllib.parse.unquote(url.username) if url.username else '',
+            'PASSWORD': urllib.parse.unquote(url.password) if url.password else '',
             'HOST': url.hostname,
             'PORT': url.port or 5432,
+            'OPTIONS': {
+                'sslmode': ssl_mode,
+            },
         }
     }
-    query_params = urllib.parse.parse_qs(url.query)
-    if 'sslmode' in query_params:
-        DATABASES['default']['OPTIONS'] = {
-            'sslmode': query_params['sslmode'][0]
-        }
 else:
     DATABASES = {
         'default': {
