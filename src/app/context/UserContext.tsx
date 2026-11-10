@@ -279,7 +279,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // ----------------------------------------------------------------------------
   const logout = () => {
     const refresh = tokenStorage.getRefresh();
-    if (refresh) {
+    if (refresh && !refresh.startsWith('mock_jwt_')) {
       api.post('/auth/logout/', { refresh }).catch(() => {});
     }
     tokenStorage.clear();

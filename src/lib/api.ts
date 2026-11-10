@@ -32,7 +32,10 @@ import {
 } from '../app/data/mockData';
 
 // Base URL for the Django REST API backend (configurable via environment variable)
-const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+const DEFAULT_PROD_API_URL = 'https://project-unimart.onrender.com/api';
+const isLocalhost = typeof window !== 'undefined' &&
+  (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+const BASE_URL = import.meta.env.VITE_API_URL || (isLocalhost ? 'http://localhost:8000/api' : DEFAULT_PROD_API_URL);
 
 // LocalStorage key constants to prevent spelling mistakes
 const TOKEN_KEY = 'unimart_access_token';

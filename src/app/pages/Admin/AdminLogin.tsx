@@ -26,6 +26,7 @@ import { ShieldCheck, Lock, Mail, ArrowRight, KeyRound, Sparkles, AlertCircle, I
 import { motion } from 'motion/react';
 import { useUser } from '../../context/UserContext';
 import { toast } from 'sonner';
+import { tokenStorage } from '../../../lib/api';
 import { 
   authenticateAdminCredentials, 
   MASTER_ADMIN_EMAIL, 
@@ -36,7 +37,7 @@ import {
 
 export const AdminLogin: React.FC = () => {
   const navigate = useNavigate();
-  const { login } = useUser();
+  const { login, logout } = useUser();
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -59,12 +60,22 @@ export const AdminLogin: React.FC = () => {
       // 1. Prioritize authentic server-side Django JWT authentication
       try {
         await login({ email: formData.email, password: formData.password });
+        const accessToken = tokenStorage.getAccess() || '';
         const sessionUser = JSON.parse(localStorage.getItem('unimart_user_session') || '{}');
+
+        // If api.ts used its offline mock fallback (returning a Buyer mock token),
+        // do not treat that as a server denial; clear mock session and run adminAuth fallback.
+        if (accessToken.startsWith('mock_jwt_access_')) {
+          logout();
+          throw new Error('Backend unreachable');
+        }
+
         if (sessionUser?.is_staff || sessionUser?.role === 'Admin') {
           toast.success(`Welcome back, ${sessionUser.name || 'Admin'}! Access granted.`);
           navigate('/admin');
           return;
         } else if (sessionUser?.email) {
+          logout();
           throw new Error('Access denied. This account does not possess administrator credentials.');
         }
       } catch (backendErr: any) {
