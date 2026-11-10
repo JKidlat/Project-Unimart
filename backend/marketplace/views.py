@@ -10,7 +10,7 @@ from django.db.models import Q
 from .models import Product, Category, WishlistItem
 from .serializers import ProductSerializer, CategorySerializer, WishlistItemSerializer
 
-from core.permissions import IsOwnerOrReadOnly
+from core.permissions import IsOwnerOrReadOnly, IsEmailVerifiedForWrite
 
 
 class ProductPagination(PageNumberPagination):
@@ -39,7 +39,7 @@ class ProductListCreateView(generics.ListCreateAPIView):
 
     def get_permissions(self):
         if self.request.method == 'POST':
-            return [permissions.IsAuthenticated()]
+            return [permissions.IsAuthenticated(), IsEmailVerifiedForWrite()]
         return [permissions.AllowAny()]
 
     def get_queryset(self):

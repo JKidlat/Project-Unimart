@@ -29,8 +29,9 @@ import { useUser } from '../../context/UserContext';
 export const Signin = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { login } = useUser();
+  const { login, loginWithGoogle } = useUser();
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -40,6 +41,29 @@ export const Signin = () => {
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  const navigateAfterLogin = (signedInUser: any) => {
+    const isAdmin = Boolean(signedInUser?.is_staff || signedInUser?.role === 'Admin');
+    if (isAdmin) {
+      navigate('/admin');
+    } else {
+      const returnTo = (location.state as any)?.returnTo;
+      navigate(returnTo || '/');
+    }
+  };
+
+  const handleGoogleSignIn = async () => {
+    setGoogleLoading(true);
+    try {
+      const signedInUser = await loginWithGoogle();
+      toast.success(`Welcome back, ${signedInUser.name}!`);
+      navigateAfterLogin(signedInUser);
+    } catch (err: any) {
+      toast.error(err.message || 'Google sign-in failed');
+    } finally {
+      setGoogleLoading(false);
+    }
   };
 
   // ----------------------------------------------------------------------------
@@ -68,14 +92,7 @@ export const Signin = () => {
 
       // Role-based routing: Admin -> /admin, Buyers & Sellers -> Shop (/) or returnTo
       const user = JSON.parse(localStorage.getItem('unimart_user_session') || 'null');
-      const role = user?.role || user?.is_staff ? (user?.is_staff ? 'Admin' : user?.role) : 'Buyer';
-      
-      if (role === 'Admin' || user?.is_staff) {
-        navigate('/admin');
-      } else {
-        const returnTo = (location.state as any)?.returnTo;
-        navigate(returnTo || '/');
-      }
+      navigateAfterLogin(user);
     } catch (err: any) {
       toast.error(err.message || "Invalid email or password");
     } finally {
@@ -103,10 +120,12 @@ export const Signin = () => {
         <div className="space-y-4 mb-8">
           <button 
             type="button"
-            className="w-full flex items-center justify-center gap-3 py-3 border border-gray-200 rounded-xl hover:bg-gray-50 transition-all font-bold text-gray-700"
+            onClick={handleGoogleSignIn}
+            disabled={loading || googleLoading}
+            className="w-full flex items-center justify-center gap-3 py-3 border border-gray-200 rounded-xl hover:bg-gray-50 transition-all font-bold text-gray-700 disabled:opacity-60 cursor-pointer"
           >
             <img src="https://www.google.com/favicon.ico" alt="Google" className="w-5 h-5" />
-            Sign in with Google
+            {googleLoading ? 'Connecting with Google...' : 'Sign in with Google'}
           </button>
         </div>
 

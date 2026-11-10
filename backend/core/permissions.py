@@ -27,3 +27,22 @@ class IsOwnerOrReadOnly(permissions.BasePermission):
         # For Product model, owner is the seller field; for others, user field
         owner = getattr(obj, 'seller', getattr(obj, 'user', None))
         return owner == request.user
+
+
+class IsEmailVerifiedForWrite(permissions.BasePermission):
+    """
+    Requires verified email ownership before allowing state-mutating marketplace actions
+    such as creating product listings, placing orders, or submitting seller KYC.
+    """
+
+    message = "Please verify your email address before completing this action. Check your inbox or click Resend Verification."
+
+    def has_permission(self, request, view):
+        if request.method in permissions.SAFE_METHODS:
+            return True
+        user = request.user
+        if not user or not user.is_authenticated:
+            return False
+        if user.is_staff or user.is_superuser:
+            return True
+        return bool(getattr(user, 'is_email_verified', False))

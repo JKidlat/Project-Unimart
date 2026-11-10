@@ -60,6 +60,10 @@ export const Checkout: React.FC = () => {
 
   const handlePlaceOrder = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (user && user.is_email_verified === false) {
+      toast.error("Please verify your email address before placing an order. Click 'Resend Verification Email' in the banner above.");
+      return;
+    }
     if (!formData.fullName || !formData.phone) {
       toast.error("Please fill in your name and phone number");
       return;

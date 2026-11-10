@@ -19,7 +19,7 @@
  */
 
 import { initializeApp } from "firebase/app";
-import { getAuth } from "firebase/auth";
+import { getAuth, GoogleAuthProvider, signInWithPopup } from "firebase/auth";
 
 // Public credentials identifying the Unimart project in Google Firebase
 const firebaseConfig = {
@@ -37,3 +37,29 @@ export const app = initializeApp(firebaseConfig);
 
 // Export the Firebase Authentication manager instance for use across the app
 export const auth = getAuth(app);
+
+// Google OAuth Provider configured to let users pick their account
+export const googleProvider = new GoogleAuthProvider();
+googleProvider.setCustomParameters({ prompt: "select_account" });
+
+/**
+ * Open Google Sign-In popup via Firebase Auth and return the verified Firebase ID token.
+ */
+export async function signInWithGooglePopup(): Promise<string> {
+  try {
+    const result = await signInWithPopup(auth, googleProvider);
+    return await result.user.getIdToken();
+  } catch (err: any) {
+    const code = err?.code || "";
+    if (code === "auth/popup-closed-by-user" || code === "auth/cancelled-popup-request") {
+      throw new Error("Google sign-in popup was closed before completing.");
+    }
+    if (code === "auth/popup-blocked") {
+      throw new Error("Pop-up blocked by your browser. Please allow pop-ups for this site.");
+    }
+    if (code === "auth/unauthorized-domain") {
+      throw new Error("This domain is not yet authorized in Firebase Auth settings.");
+    }
+    throw new Error(err?.message || "Google sign-in failed. Please try again.");
+  }
+}

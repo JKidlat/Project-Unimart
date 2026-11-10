@@ -269,3 +269,18 @@ if not DEBUG:
     CSRF_COOKIE_HTTPONLY = True
     SECURE_SSL_REDIRECT = os.environ.get('SECURE_SSL_REDIRECT', 'True').lower() in ('true', '1', 't')
 
+# Frontend URL for verification & password reset links
+FRONTEND_URL = os.environ.get(
+    'FRONTEND_URL',
+    'https://project-unimart.vercel.app' if not DEBUG else 'http://localhost:5173'
+).rstrip('/')
+
+# Email Delivery via Resend HTTPS API (Port 443; compatible with Render Free tier)
+RESEND_API_KEY = os.environ.get('RESEND_API_KEY', '')
+DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'Unimart <onboarding@resend.dev>')
+EMAIL_VERIFICATION_MAX_AGE = int(os.environ.get('EMAIL_VERIFICATION_MAX_AGE', 60 * 60 * 24 * 3))  # 72 hours
+PASSWORD_RESET_TIMEOUT = int(os.environ.get('PASSWORD_RESET_TIMEOUT', 60 * 60))  # 1 hour
+
+# Firebase Project Configuration
+FIREBASE_PROJECT_ID = os.environ.get('FIREBASE_PROJECT_ID', 'unimart-c4308')
+

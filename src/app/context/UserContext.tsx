@@ -25,6 +25,7 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { api, tokenStorage } from '../../lib/api';
+import { signInWithGooglePopup } from '../../lib/firebase';
 
 // Allowed user roles in Unimart
 export type UserRole = 'Buyer' | 'Seller' | 'Admin';
@@ -51,6 +52,7 @@ export interface UserProfile {
   joinDate: string;
   referralCode: string;
   is_staff?: boolean;
+  is_email_verified?: boolean;
   kyc_status?: KYCStatus;
   businessName?: string;
 }
@@ -61,13 +63,34 @@ interface UserContextType {
   searchQuery: string;
   setSearchQuery: (query: string) => void;
   login: (profileOrCredentials: any) => Promise<void>;
-  signup: (formData: any) => Promise<void>;
+  loginWithGoogle: (options?: { role?: string; universityId?: number | null; referralCode?: string }) => Promise<UserProfile>;
+  signup: (formData: any) => Promise<UserProfile>;
   updateProfile: (updates: Partial<UserProfile>) => Promise<void>;
+  refreshUserProfile: () => Promise<UserProfile | null>;
   logout: () => void;
   notificationSettings: NotificationSettings;
   updateNotificationSettings: (settings: Partial<NotificationSettings>) => void;
   isLoggedIn: boolean;
   isLoading: boolean;
+}
+
+function formatUserProfile(rawUser: any, fallback: Partial<UserProfile> = {}): UserProfile {
+  const email = rawUser?.email || fallback.email || '';
+  const fallbackName = email ? email.split('@')[0] : 'Student';
+  return {
+    id: rawUser?.id || fallback.id || Date.now(),
+    name: rawUser?.full_name || rawUser?.name || fallback.name || fallbackName,
+    email,
+    university: rawUser?.university_name || rawUser?.university || fallback.university || 'University of Ghana (UG)',
+    role: (rawUser?.role as UserRole) || fallback.role || 'Buyer',
+    profilePic: rawUser?.profile_pic || fallback.profilePic || null,
+    joinDate: fallback.joinDate || new Date().toLocaleDateString('en-GB', { month: 'short', year: 'numeric' }),
+    referralCode: rawUser?.referral_code || fallback.referralCode || `UNIM-${email.slice(0, 2).toUpperCase()}-2026`,
+    is_staff: rawUser?.is_staff ?? fallback.is_staff ?? false,
+    is_email_verified: rawUser?.is_email_verified ?? fallback.is_email_verified ?? false,
+    kyc_status: rawUser?.kyc_status || fallback.kyc_status || 'none',
+    businessName: rawUser?.business_name || fallback.businessName || undefined,
+  };
 }
 
 // Create the Context with undefined default value
@@ -122,19 +145,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
         api.get('/auth/me/')
           .then((fresh) => {
             if (fresh && fresh.email) {
-              const formatted: UserProfile = {
-                id: fresh.id,
-                name: fresh.full_name || fresh.name || savedUser.name,
-                email: fresh.email,
-                university: fresh.university_name || fresh.university || savedUser.university,
-                role: (fresh.role as UserRole) || savedUser.role || 'Buyer',
-                profilePic: fresh.profile_pic || savedUser.profilePic,
-                joinDate: savedUser.joinDate || 'Oct 2024',
-                referralCode: fresh.referral_code || savedUser.referralCode,
-                is_staff: fresh.is_staff || false,
-                kyc_status: fresh.kyc_status || savedUser.kyc_status || 'none',
-                businessName: fresh.business_name || savedUser.businessName,
-              };
+              const formatted = formatUserProfile(fresh, savedUser);
               setUser(formatted);
               tokenStorage.setUser(formatted);
             }
@@ -150,6 +161,17 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setIsLoading(false);
     }
   }, []);
+
+  const persistAuthResponse = (res: any, fallback: Partial<UserProfile> = {}): UserProfile => {
+    if (res?.tokens?.access) {
+      tokenStorage.setTokens(res.tokens.access, res.tokens.refresh);
+    }
+    const profile = formatUserProfile(res?.user || {}, fallback);
+    setUser(profile);
+    setIsLoggedIn(true);
+    tokenStorage.setUser(profile);
+    return profile;
+  };
 
   // ----------------------------------------------------------------------------
   // Action: Log In
@@ -172,37 +194,34 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
         password: data.password || 'password123'
       });
 
-      if (res.tokens?.access) {
-        tokenStorage.setTokens(res.tokens.access, res.tokens.refresh);
-      }
-
-      const rawUser = res.user || {};
-      const profile: UserProfile = {
-        id: rawUser.id || Date.now(),
-        name: rawUser.full_name || rawUser.name || data.email.split('@')[0],
-        email: rawUser.email || data.email,
-        university: rawUser.university_name || rawUser.university || 'University of Ghana (UG)',
-        role: (rawUser.role as UserRole) || 'Buyer',
-        profilePic: rawUser.profile_pic || null,
-        joinDate: 'Oct 2024',
-        referralCode: rawUser.referral_code || `UNIM-${data.email.slice(0, 2).toUpperCase()}-2026`,
-        is_staff: rawUser.is_staff || false,
-        kyc_status: rawUser.kyc_status || 'none',
-        businessName: rawUser.business_name || undefined,
-      };
-
-      setUser(profile);
-      setIsLoggedIn(true);
-      tokenStorage.setUser(profile);
+      persistAuthResponse(res, { email: data.email, joinDate: 'Oct 2024' });
     } catch (err: any) {
       throw err;
     }
   };
 
   // ----------------------------------------------------------------------------
+  // Action: Sign In with Google (Firebase ID Token -> Django SimpleJWT)
+  // ----------------------------------------------------------------------------
+  const loginWithGoogle = async (options?: {
+    role?: string;
+    universityId?: number | null;
+    referralCode?: string;
+  }): Promise<UserProfile> => {
+    const idToken = await signInWithGooglePopup();
+    const res = await api.post('/auth/google/', {
+      id_token: idToken,
+      role: options?.role || 'Buyer',
+      university_id: options?.universityId ?? null,
+      referral_code: options?.referralCode || '',
+    });
+    return persistAuthResponse(res, { is_email_verified: true });
+  };
+
+  // ----------------------------------------------------------------------------
   // Action: Sign Up (New Student Account)
   // ----------------------------------------------------------------------------
-  const signup = async (formData: any) => {
+  const signup = async (formData: any): Promise<UserProfile> => {
     try {
       const res = await api.post('/auth/register/', {
         email: formData.email,
@@ -217,31 +236,40 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
         referral_code: formData.referral_code || formData.referralCode || '',
       });
 
-      if (res.tokens?.access) {
-        tokenStorage.setTokens(res.tokens.access, res.tokens.refresh);
-      }
-
-      const rawUser = res.user || {};
-      const profile: UserProfile = {
-        id: rawUser.id || Date.now(),
-        name: rawUser.full_name || formData.fullName,
-        email: rawUser.email || formData.email,
-        university: rawUser.university_name || formData.university || 'University of Ghana (UG)',
+      return persistAuthResponse(res, {
+        name: formData.fullName || formData.name,
+        email: formData.email,
+        university: formData.university || 'University of Ghana (UG)',
         role: (formData.role as UserRole) || 'Buyer',
-        profilePic: null,
-        joinDate: new Date().toLocaleDateString('en-GB', { month: 'short', year: 'numeric' }),
-        referralCode: rawUser.referral_code || `UNIM-${formData.fullName.split(' ').map((w: string) => w[0]).join('').toUpperCase()}-${Date.now().toString().slice(-4)}`,
-        is_staff: false,
-        kyc_status: 'none',
+        is_email_verified: false,
         businessName: formData.businessName || undefined,
-      };
-
-      setUser(profile);
-      setIsLoggedIn(true);
-      tokenStorage.setUser(profile);
+      });
     } catch (err: any) {
       throw err;
     }
+  };
+
+  // ----------------------------------------------------------------------------
+  // Action: Refresh Profile from Backend (e.g. after email verification)
+  // ----------------------------------------------------------------------------
+  const refreshUserProfile = async (): Promise<UserProfile | null> => {
+    const token = tokenStorage.getAccess();
+    if (!token || token.startsWith('mock_jwt_') || token.startsWith('unimart_auth_')) {
+      return user;
+    }
+    try {
+      const fresh = await api.get('/auth/me/');
+      if (fresh && fresh.email) {
+        const formatted = formatUserProfile(fresh, user || {});
+        setUser(formatted);
+        setIsLoggedIn(true);
+        tokenStorage.setUser(formatted);
+        return formatted;
+      }
+    } catch {
+      // Ignore refresh failure if offline
+    }
+    return user;
   };
 
   // ----------------------------------------------------------------------------
@@ -293,8 +321,10 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
       searchQuery,
       setSearchQuery,
       login,
+      loginWithGoogle,
       signup,
       updateProfile,
+      refreshUserProfile,
       logout,
       notificationSettings,
       updateNotificationSettings,

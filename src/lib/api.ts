@@ -593,14 +593,26 @@ export async function apiRequest<T = any>(
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      const message = errorData.error || errorData.detail || errorData.message || `Request failed with status ${response.status}`;
-      throw new Error(message);
+      let message = errorData.error || errorData.detail || errorData.message;
+      if (!message && errorData && typeof errorData === 'object') {
+        const firstVal = Object.values(errorData).flat().find(Boolean);
+        if (typeof firstVal === 'string') message = firstVal;
+      }
+      throw new Error(message || `Request failed with status ${response.status}`);
     }
 
     return await response.json();
   } catch (err: any) {
     // If backend is offline or network fails, fall back to browser localStorage mock store
     if (err.name === 'TypeError' || err.message?.includes('Failed to fetch') || err.message?.includes('NetworkError')) {
+      if (
+        endpoint.includes('/auth/google') ||
+        endpoint.includes('/auth/password-reset') ||
+        endpoint.includes('/auth/verify-email') ||
+        endpoint.includes('/auth/resend-verification')
+      ) {
+        throw new Error('Unable to reach the Unimart server. Please wait a moment and try again.');
+      }
       return handleMockFallback(endpoint, options);
     }
     throw err;

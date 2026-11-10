@@ -8,9 +8,9 @@ User = get_user_model()
 
 @admin.register(User)
 class UserAdmin(admin.ModelAdmin):
-    list_display = ('email', 'full_name', 'is_active', 'is_staff', 'is_verified_student')
+    list_display = ('email', 'full_name', 'is_active', 'is_staff', 'is_email_verified', 'is_verified_student')
     search_fields = ('email', 'full_name')
-    list_filter = ('is_active', 'is_staff', 'is_verified_student')
+    list_filter = ('is_active', 'is_staff', 'is_email_verified', 'is_verified_student')
     ordering = ('email',)
 
 

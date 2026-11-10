@@ -49,6 +49,10 @@ export const Sell = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (user.is_email_verified === false) {
+      toast.error("Please verify your email address before listing items.");
+      return;
+    }
     if (!formData.title || !formData.price || !formData.category) {
       toast.error("Please fill in all required fields");
       return;

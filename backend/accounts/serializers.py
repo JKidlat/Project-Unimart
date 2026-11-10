@@ -22,7 +22,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
         model = User
         fields = [
             'id', 'email', 'full_name', 'phone_number', 'is_active', 'is_staff', 
-            'is_verified_student', 'university_id', 'university_name', 'is_vendor', 
+            'is_email_verified', 'is_verified_student', 'university_id', 'university_name', 'is_vendor', 
             'role', 'profile_pic', 'referral_code', 'referrals_count', 'orders_count',
             'wishlist_count', 'kyc_status'
         ]

@@ -71,6 +71,10 @@ import { CookieConsentBanner } from './components/Legal/CookieConsentBanner';
 // ============================================================================
 import { Signup } from './pages/Auth/Signup';
 import { Signin } from './pages/Auth/Signin';
+import { ForgotPassword } from './pages/Auth/ForgotPassword';
+import { ResetPassword } from './pages/Auth/ResetPassword';
+import { VerifyEmail } from './pages/Auth/VerifyEmail';
+import { VerificationBanner } from './components/VerificationBanner';
 
 // ============================================================================
 // Seller Pages
@@ -165,6 +169,7 @@ const AppContent = () => {
       
       {/* Main navigation header — visible on all standard non-admin pages */}
       {!isAdminPage && <Navbar />}
+      {!isAdminPage && <VerificationBanner />}
       
       {/* Main router container */}
       <main className="flex-1">
@@ -178,6 +183,9 @@ const AppContent = () => {
           <Route path="/cart" element={<Cart />} />
           <Route path="/signup" element={<Signup />} />
           <Route path="/signin" element={<Signin />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
+          <Route path="/verify-email" element={<VerifyEmail />} />
           <Route path="/wishlist" element={<Wishlist />} />
           <Route path="/referrals" element={<Referrals />} />
           

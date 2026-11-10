@@ -2,6 +2,7 @@ from rest_framework import generics, permissions, status
 from rest_framework.response import Response
 from rest_framework.pagination import PageNumberPagination
 from django.db.models import Q
+from core.permissions import IsEmailVerifiedForWrite
 from .models import Order
 from .serializers import OrderSerializer, OrderStatusUpdateSerializer
 
@@ -17,8 +18,12 @@ class OrderListCreateView(generics.ListCreateAPIView):
     List user orders (as buyer or seller) or create a new order with cart items.
     """
     serializer_class = OrderSerializer
-    permission_classes = [permissions.IsAuthenticated]
     pagination_class = OrderPagination
+
+    def get_permissions(self):
+        if self.request.method == 'POST':
+            return [permissions.IsAuthenticated(), IsEmailVerifiedForWrite()]
+        return [permissions.IsAuthenticated()]
 
     def get_queryset(self):
         user = self.request.user

@@ -166,6 +166,10 @@ export const KYC: React.FC = () => {
   };
 
   const handleSubmit = async () => {
+    if (user.is_email_verified === false) {
+      toast.error('Please verify your email address before submitting KYC verification.');
+      return;
+    }
     if (!selfieFile || !idFile) {
       toast.error('Please upload both your selfie and ID document.');
       return;
