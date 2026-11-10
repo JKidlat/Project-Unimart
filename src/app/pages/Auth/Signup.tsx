@@ -22,8 +22,8 @@
 import React, { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router';
 import { motion } from 'motion/react';
-import { ShieldCheck, Mail, Lock, User, Phone, GraduationCap, Briefcase, ChevronRight, CheckCircle2 } from 'lucide-react';
-import { universities } from '../../data/mockData';
+import { ShieldCheck, Mail, Lock, User, Phone, Briefcase, ChevronRight } from 'lucide-react';
+import { UniversitySelector } from '../../components/common/UniversitySelector';
 import { toast } from 'sonner';
 import { resolveUserDashboardPath, useUser } from '../../context/UserContext';
 import type { UserRole } from '../../context/UserContext';
@@ -41,6 +41,7 @@ export const Signup = () => {
     username: '',
     email: prefillEmail,
     university: '',
+    universityId: null as number | null,
     password: '',
     confirmPassword: '',
     role: 'Buyer',
@@ -221,18 +222,17 @@ export const Signup = () => {
           {/* University Dropdown Selector */}
           <div className="space-y-2">
             <label className="text-sm font-bold text-gray-700">University</label>
-            <div className="relative">
-              <GraduationCap className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-              <select
-                name="university"
-                required
-                className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-[#f3d7db] rounded-xl focus:ring-2 focus:ring-[#a14b58] focus:outline-none appearance-none"
-                onChange={handleInputChange}
-              >
-                <option value="">Select your institution</option>
-                {universities.map(uni => <option key={uni} value={uni}>{uni}</option>)}
-              </select>
-            </div>
+            <UniversitySelector
+              value={formData.university}
+              onChange={(name, uni) =>
+                setFormData((prev) => ({
+                  ...prev,
+                  university: name,
+                  universityId: uni?.id ?? null,
+                }))
+              }
+              required
+            />
           </div>
 
           {/* Role Choice: Buyer vs Seller */}

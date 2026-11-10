@@ -10,6 +10,7 @@ Authentication endpoints:
 
 from django.urls import path
 from .views import (
+    ChangePasswordView,
     GoogleAccountLinkView,
     GoogleAuthView,
     LoginView,
@@ -20,6 +21,7 @@ from .views import (
     ResendVerificationEmailView,
     UserProfileView,
     UserListView,
+    UserRoleChangeRequestView,
     VerifyEmailView,
     KYCSubmissionView,
     KYCDetailView,
@@ -37,8 +39,10 @@ urlpatterns = [
     path("resend-verification/", ResendVerificationEmailView.as_view(), name="resend_verification"),
     path("password-reset/", PasswordResetRequestView.as_view(), name="password_reset"),
     path("password-reset/confirm/", PasswordResetConfirmView.as_view(), name="password_reset_confirm"),
+    path("change-password/", ChangePasswordView.as_view(), name="change_password"),
     path("me/", UserProfileView.as_view(), name="user_profile"),
     path("users/", UserListView.as_view(), name="user_list"),
+    path("role-requests/", UserRoleChangeRequestView.as_view(), name="role_requests"),
     path("kyc/", KYCSubmissionView.as_view(), name="kyc-list-create"),
     path("kyc/<str:lookup>/", KYCDetailView.as_view(), name="kyc-detail"),
 ]

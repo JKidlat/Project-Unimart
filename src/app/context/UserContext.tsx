@@ -47,11 +47,13 @@ export interface UserProfile {
   name: string;
   email: string;
   university: string;
+  universityId?: number | null;
   role: UserRole;
   profilePic: string | null;
   joinDate: string;
   referralCode: string;
   is_staff?: boolean;
+  is_superuser?: boolean;
   is_email_verified?: boolean;
   hasFirebaseLinked?: boolean;
   kyc_status?: KYCStatus;
@@ -93,12 +95,16 @@ function formatUserProfile(rawUser: any, fallback: Partial<UserProfile> = {}): U
     id: rawUser?.id || fallback.id || Date.now(),
     name: rawUser?.full_name || rawUser?.name || fallback.name || fallbackName,
     email,
-    university: rawUser?.university_name || rawUser?.university || fallback.university || 'University of Ghana (UG)',
+    university: rawUser?.university_name || rawUser?.university || fallback.university || '',
+    universityId: rawUser?.university_id ?? fallback.universityId ?? null,
     role: (rawUser?.role as UserRole) || fallback.role || 'Buyer',
     profilePic: rawUser?.profile_pic || fallback.profilePic || null,
-    joinDate: fallback.joinDate || new Date().toLocaleDateString('en-GB', { month: 'short', year: 'numeric' }),
+    joinDate: rawUser?.date_joined
+      ? new Date(rawUser.date_joined).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })
+      : (fallback.joinDate || new Date().toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })),
     referralCode: rawUser?.referral_code || fallback.referralCode || `UNIM-${email.slice(0, 2).toUpperCase()}-2026`,
     is_staff: rawUser?.is_staff ?? fallback.is_staff ?? false,
+    is_superuser: rawUser?.is_superuser ?? fallback.is_superuser ?? false,
     is_email_verified: rawUser?.is_email_verified ?? fallback.is_email_verified ?? false,
     hasFirebaseLinked: rawUser?.has_firebase_linked ?? fallback.hasFirebaseLinked ?? false,
     kyc_status: rawUser?.kyc_status || fallback.kyc_status || 'none',
@@ -130,49 +136,52 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
   });
 
   // ----------------------------------------------------------------------------
-  // Effect: Hydrate user session from localStorage on startup
+  // Effect: Hydrate user session from backend JWT verification on startup
   // ----------------------------------------------------------------------------
   useEffect(() => {
-    // Check 1: Enforce the 72-hour session lifetime requirement
     if (tokenStorage.isExpired()) {
       tokenStorage.clear();
       setIsLoading(false);
       return;
     }
 
-    // Check 2: Load cached user profile if present
+    const token = tokenStorage.getAccess();
     const savedUser = tokenStorage.getUser();
-    if (savedUser) {
-      setUser(savedUser);
-      setIsLoggedIn(true);
 
-      // If user is Admin or staff, preserve session immediately without remote verification
-      if (savedUser.role === 'Admin' || savedUser.is_staff) {
-        setIsLoading(false);
-        return;
+    if (!token || token.startsWith('mock_jwt_') || token.startsWith('unimart_auth_')) {
+      if (savedUser || token) {
+        tokenStorage.clear();
       }
-
-      // Check 3: Background sync with backend to get latest profile updates
-      const token = tokenStorage.getAccess();
-      if (token) {
-        api.get('/auth/me/')
-          .then((fresh) => {
-            if (fresh && fresh.email) {
-              const formatted = formatUserProfile(fresh, savedUser);
-              setUser(formatted);
-              tokenStorage.setUser(formatted);
-            }
-          })
-          .catch(() => {
-            // Keep offline user — session already set above
-          })
-          .finally(() => setIsLoading(false));
-      } else {
-        setIsLoading(false);
-      }
-    } else {
       setIsLoading(false);
+      return;
     }
+
+    api.get('/auth/me/')
+      .then((fresh) => {
+        if (fresh && fresh.email) {
+          const formatted = formatUserProfile(fresh, savedUser || {});
+          setUser(formatted);
+          setIsLoggedIn(true);
+          tokenStorage.setUser(formatted);
+        } else {
+          tokenStorage.clear();
+          setUser(null);
+          setIsLoggedIn(false);
+        }
+      })
+      .catch((err: any) => {
+        // Always revoke unverified sessions on auth denial or for admin claims
+        const claimsAdmin = Boolean(savedUser?.is_staff || savedUser?.role === 'Admin');
+        if (err?.status === 401 || err?.status === 403 || claimsAdmin) {
+          tokenStorage.clear();
+          setUser(null);
+          setIsLoggedIn(false);
+        } else if (savedUser) {
+          setUser(savedUser);
+          setIsLoggedIn(true);
+        }
+      })
+      .finally(() => setIsLoading(false));
   }, []);
 
   const persistAuthResponse = (res: any, fallback: Partial<UserProfile> = {}): UserProfile => {
@@ -191,23 +200,12 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // ----------------------------------------------------------------------------
   const login = async (data: any): Promise<UserProfile> => {
     try {
-      // Direct session injection (used for Mock demo or Admin accounts)
-      if (data.name && data.email && !data.password) {
-        setUser(data);
-        setIsLoggedIn(true);
-        setIsLoading(false);
-        tokenStorage.setUser(data);
-        tokenStorage.setTokens('unimart_auth_' + Date.now());
-        return data;
-      }
-
-      // Standard API password authentication
       const res = await api.post('/auth/login/', {
         email: data.email,
-        password: data.password || 'password123'
+        password: data.password,
       });
 
-      return persistAuthResponse(res, { email: data.email, joinDate: 'Oct 2024' });
+      return persistAuthResponse(res, { email: data.email });
     } catch (err: any) {
       throw err;
     }
@@ -261,7 +259,8 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const profile = persistAuthResponse(res, {
         name: formData.fullName || formData.name,
         email: formData.email,
-        university: formData.university || 'University of Ghana (UG)',
+        university: formData.university || '',
+        universityId: formData.universityId ?? null,
         role: (formData.role as UserRole) || 'Buyer',
         is_email_verified: false,
         businessName: formData.businessName || undefined,
@@ -304,10 +303,11 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const updateProfile = async (updates: Partial<UserProfile>) => {
     const payload: Record<string, any> = {};
     if (updates.name !== undefined) payload.full_name = updates.name;
+    if (updates.universityId !== undefined) payload.university_id = updates.universityId;
     if (updates.university !== undefined) payload.university = updates.university;
     if (updates.profilePic !== undefined) payload.profile_pic = updates.profilePic;
     if (updates.businessName !== undefined) payload.business_name = updates.businessName;
-    if (updates.role !== undefined) payload.role = updates.role;
+    if (updates.role !== undefined && updates.role !== 'Admin') payload.role = updates.role;
 
     const fresh = await api.patch('/auth/me/', payload);
     if (fresh && fresh.email) {

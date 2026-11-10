@@ -2,113 +2,95 @@
  * ==============================================================================
  * KYC (KNOW YOUR CUSTOMER) VERIFICATION CONTEXT (KYCContext.tsx)
  * ==============================================================================
- * This React Context manages seller identity verification state.
- *
- * Why KYC is required on Unimart:
- * - Unimart is a trusted campus marketplace exclusively for Ghanaian students.
- * - To prevent fraud, stolen goods, and scammers, students who want to sell items
- *   must submit proof of identity (student ID card or Ghana Card, selfie, and
- *   institution email).
- * - Only after an Administrator approves the KYC request can the student post ads
- *   and receive orders.
- *
- * Verification Lifecycle:
- * 1. 'none'     -> User has not submitted verification documents.
- * 2. 'pending'  -> Submitted; currently in Admin review queue.
- * 3. 'approved' -> Verified by Admin; full seller studio privileges granted.
- * 4. 'rejected' -> Rejected by Admin with a visible reason (e.g. blurry ID card).
- *
- * How to use:
- * const { kycStatus, submitKYC, refreshKYCStatus } = useKYC();
+ * Manages seller identity verification state via the Django REST backend (`/api/kyc/`).
  * ==============================================================================
  */
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { kycStorage, tokenStorage } from '../../lib/api';
+import { api, tokenStorage } from '../../lib/api';
 
-// Four possible verification states
 export type KYCStatus = 'none' | 'pending' | 'approved' | 'rejected';
 
-// Structure of an identity verification submission
 export interface KYCSubmission {
-  email: string;                  // User's student email
-  selfieBase64: string;           // Base64 encoded selfie image
-  idDocBase64: string;            // Base64 encoded student ID or Ghana Card image
-  institutionEmail: string;       // Official campus email
-  businessName: string;           // Store / trade name
-  mode: 'seller_first' | 'buyer_upgrade'; // Whether newly registering or upgrading from Buyer
-  status: KYCStatus;              // Current approval state
-  submittedAt: string;            // ISO timestamp
-  reviewedAt: string | null;      // ISO timestamp when admin reviewed
-  rejectionReason: string | null; // Feedback note from admin if rejected
+  id?: number;
+  email: string;
+  selfieBase64: string;
+  idDocBase64: string;
+  institutionEmail: string;
+  businessName: string;
+  mode: 'seller_first' | 'buyer_upgrade';
+  status: KYCStatus;
+  submittedAt: string;
+  reviewedAt: string | null;
+  rejectionReason: string | null;
 }
 
-// Interface for values and methods provided by useKYC()
 interface KYCContextType {
   kycStatus: KYCStatus;
   kycData: KYCSubmission | null;
-  submitKYC: (data: Omit<KYCSubmission, 'status' | 'submittedAt' | 'reviewedAt' | 'rejectionReason'>) => Promise<void>;
-  refreshKYCStatus: () => void;
+  submitKYC: (data: Omit<KYCSubmission, 'id' | 'status' | 'submittedAt' | 'reviewedAt' | 'rejectionReason'>) => Promise<void>;
+  refreshKYCStatus: () => Promise<void>;
 }
 
-// Create the context
 const KYCContext = createContext<KYCContextType | undefined>(undefined);
 
-// ==============================================================================
-// KYC PROVIDER COMPONENT
-// ==============================================================================
 export const KYCProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [kycStatus, setKYCStatus] = useState<KYCStatus>('none');
   const [kycData, setKYCData] = useState<KYCSubmission | null>(null);
 
-  /**
-   * Refreshes the active user's verification record from localStorage.
-   */
-  const refreshKYCStatus = useCallback(() => {
+  const refreshKYCStatus = useCallback(async () => {
+    const token = tokenStorage.getAccess();
     const user = tokenStorage.getUser();
-    if (!user?.email) {
+    if (!token || !user?.email) {
       setKYCStatus('none');
       setKYCData(null);
       return;
     }
-    const record = kycStorage.getByEmail(user.email);
-    if (record) {
-      setKYCStatus(record.status as KYCStatus);
-      setKYCData(record);
-    } else {
-      // Also check if user session has kyc_status set directly
-      setKYCStatus(user.kyc_status || 'none');
-      setKYCData(null);
+
+    try {
+      const res = await api.get<KYCSubmission[] | { results: KYCSubmission[] }>('/kyc/');
+      const list = Array.isArray(res) ? res : Array.isArray(res?.results) ? res.results : [];
+      const mine =
+        list.find((r) => (r.email || '').toLowerCase() === user.email.toLowerCase()) ||
+        list[0] ||
+        null;
+
+      if (mine) {
+        setKYCStatus(mine.status as KYCStatus);
+        setKYCData(mine);
+      } else {
+        setKYCStatus((user.kyc_status as KYCStatus) || 'none');
+        setKYCData(null);
+      }
+    } catch {
+      setKYCStatus((user.kyc_status as KYCStatus) || 'none');
     }
   }, []);
 
-  // Check verification status when provider mounts
   useEffect(() => {
     refreshKYCStatus();
   }, [refreshKYCStatus]);
 
-  /**
-   * Submits new KYC documents for administrator review.
-   */
-  const submitKYC = useCallback(async (data: Omit<KYCSubmission, 'status' | 'submittedAt' | 'reviewedAt' | 'rejectionReason'>) => {
-    const submission: KYCSubmission = {
-      ...data,
-      status: 'pending',
-      submittedAt: new Date().toISOString(),
-      reviewedAt: null,
-      rejectionReason: null,
-    };
-    kycStorage.save(submission);
+  const submitKYC = useCallback(
+    async (data: Omit<KYCSubmission, 'id' | 'status' | 'submittedAt' | 'reviewedAt' | 'rejectionReason'>) => {
+      const created = await api.post<KYCSubmission>('/kyc/', {
+        institutionEmail: data.institutionEmail,
+        businessName: data.businessName,
+        selfieBase64: data.selfieBase64,
+        idDocBase64: data.idDocBase64,
+        mode: data.mode,
+      });
 
-    // Synchronize active user session object
-    const user = tokenStorage.getUser();
-    if (user) {
-      tokenStorage.setUser({ ...user, kyc_status: 'pending' });
-    }
+      const user = tokenStorage.getUser();
+      if (user) {
+        tokenStorage.setUser({ ...user, kyc_status: created.status || 'pending' });
+      }
 
-    setKYCStatus('pending');
-    setKYCData(submission);
-  }, []);
+      setKYCStatus((created.status as KYCStatus) || 'pending');
+      setKYCData(created);
+    },
+    []
+  );
 
   return (
     <KYCContext.Provider value={{ kycStatus, kycData, submitKYC, refreshKYCStatus }}>
@@ -117,12 +99,6 @@ export const KYCProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   );
 };
 
-// ==============================================================================
-// CUSTOM HOOK: useKYC()
-// ==============================================================================
-/**
- * Hook to read KYC status and submit identity documents from any component.
- */
 export const useKYC = () => {
   const ctx = useContext(KYCContext);
   if (!ctx) throw new Error('useKYC must be used within KYCProvider');

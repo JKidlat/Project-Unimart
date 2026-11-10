@@ -18,7 +18,7 @@ from django.utils import timezone
 from django.utils.encoding import force_str
 from django.utils.http import urlsafe_base64_decode
 
-from core.permissions import IsEmailVerifiedForWrite
+from core.permissions import IsEmailVerifiedForWrite, IsPlatformAdmin
 from .authentication import FirebaseAccountError, resolve_existing_firebase_user, verify_firebase_token
 from .emails import (
     send_password_reset_email,
@@ -26,8 +26,15 @@ from .emails import (
     send_verification_email_detailed,
     verify_email_verification_token,
 )
-from .models import KYCSubmission
-from .serializers import RegisterSerializer, UserProfileSerializer, ProfileUpdateSerializer, KYCSubmissionSerializer
+from .models import KYCSubmission, RoleChangeRequest
+from .serializers import (
+    RegisterSerializer,
+    UserProfileSerializer,
+    ProfileUpdateSerializer,
+    KYCSubmissionSerializer,
+    KYCAdminReviewSerializer,
+    RoleChangeRequestSerializer,
+)
 
 
 User = get_user_model()
@@ -356,9 +363,9 @@ class UserListView(generics.ListAPIView):
     Admin user listing endpoint.
     Restricted to staff and admin users to protect student privacy.
     """
-    queryset = User.objects.all().select_related('profile', 'profile__university')
+    queryset = User.objects.all().select_related('profile', 'profile__university').order_by('-date_joined', '-id')
     serializer_class = UserProfileSerializer
-    permission_classes = [IsAdminUser]
+    permission_classes = [IsPlatformAdmin]
 
 
 class KYCSubmissionView(generics.ListCreateAPIView):
@@ -367,6 +374,7 @@ class KYCSubmissionView(generics.ListCreateAPIView):
     Admin gets all submissions (with optional ?email= filter); normal users see their own.
     """
     serializer_class = KYCSubmissionSerializer
+    pagination_class = None
 
     def get_permissions(self):
         if self.request.method == 'POST':
@@ -395,21 +403,73 @@ class KYCDetailView(generics.RetrieveUpdateAPIView):
     When status transitions to 'approved', automatically upgrades user to Seller (is_vendor=True).
     """
     queryset = KYCSubmission.objects.all()
-    serializer_class = KYCSubmissionSerializer
-    permission_classes = [IsAdminUser]
+    serializer_class = KYCAdminReviewSerializer
+    permission_classes = [IsPlatformAdmin]
 
     def get_object(self):
         lookup = self.kwargs.get('lookup')
         if str(lookup).isdigit():
             return generics.get_object_or_404(KYCSubmission, id=int(lookup))
-        return generics.get_object_or_404(KYCSubmission, email=lookup)
+        return KYCSubmission.objects.filter(email=lookup).order_by('-submitted_at').first() or generics.get_object_or_404(KYCSubmission, email=lookup)
 
     def perform_update(self, serializer):
         instance = serializer.save(reviewed_at=timezone.now())
         if instance.status == 'approved':
             profile = getattr(instance.user, 'profile', None)
             if profile:
+                update_fields = ['is_vendor']
                 profile.is_vendor = True
-                profile.save(update_fields=['is_vendor'])
+                if instance.business_name and not profile.business_name:
+                    profile.business_name = instance.business_name
+                    update_fields.append('business_name')
+                profile.save(update_fields=update_fields)
+            if not instance.user.is_verified_student:
+                instance.user.is_verified_student = True
+                instance.user.save(update_fields=['is_verified_student'])
+
+
+class ChangePasswordView(generics.GenericAPIView):
+    """Allow an authenticated user (including administrators) to change their password."""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        current_password = request.data.get('current_password') or ''
+        new_password = request.data.get('new_password') or ''
+        if not current_password or not new_password:
+            return Response(
+                {'error': 'Current password and new password are required.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        user = request.user
+        if not user.check_password(current_password):
+            return Response(
+                {'error': 'Current password is incorrect.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        try:
+            validate_password(new_password, user=user)
+        except DjangoValidationError as exc:
+            return Response({'error': ' '.join(exc.messages)}, status=status.HTTP_400_BAD_REQUEST)
+        user.set_password(new_password)
+        user.save(update_fields=['password'])
+        return Response({'message': 'Password updated successfully.'})
+
+
+class UserRoleChangeRequestView(generics.ListCreateAPIView):
+    """List current user's role change requests or submit a Buyer <-> Seller change request."""
+    serializer_class = RoleChangeRequestSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return RoleChangeRequest.objects.filter(user=self.request.user)
+
+    def perform_create(self, serializer):
+        user = self.request.user
+        if user.is_staff or user.is_superuser:
+            from rest_framework.exceptions import ValidationError
+            raise ValidationError({'requestedRole': 'Administrator accounts cannot use student role switch requests.'})
+        is_vendor = bool(getattr(getattr(user, 'profile', None), 'is_vendor', False))
+        current_role = 'Seller' if is_vendor else 'Buyer'
+        serializer.save(user=user, current_role=current_role, status='pending')
 
 

@@ -57,12 +57,13 @@ class OrderSerializer(serializers.ModelSerializer):
             'payment_method',
             'payment_reference',
             'status',
+            'refund_status',
             'items',
             'cart_items',
             'created_at',
             'updated_at',
         ]
-        read_only_fields = ['id', 'buyer_email', 'total_amount', 'status', 'created_at', 'updated_at', 'items']
+        read_only_fields = ['id', 'buyer_email', 'total_amount', 'status', 'refund_status', 'created_at', 'updated_at', 'items']
 
     @transaction.atomic
     def create(self, validated_data):

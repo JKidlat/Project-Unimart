@@ -8,7 +8,8 @@ import { motion } from 'motion/react';
 import { useUser } from '../context/UserContext';
 import { toast } from 'sonner';
 import { Link, useNavigate } from 'react-router';
-import { universities } from '../data/mockData';
+import { UniversitySelector } from '../components/common/UniversitySelector';
+import type { UniversityOption } from '../../hooks/useUniversities';
 
 export const AccountSettings = () => {
   const { user, updateProfile, linkGoogleAccount, notificationSettings, updateNotificationSettings, logout } = useUser();
@@ -33,10 +34,11 @@ export const AccountSettings = () => {
     }
   };
 
-  const handleUniversityChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
+  const handleUniversityChange = async (name: string, uni?: UniversityOption | null) => {
+    if (!name) return;
     try {
-      await updateProfile({ university: e.target.value });
-      toast.success(`Default university updated to ${e.target.value}`);
+      await updateProfile({ university: name, universityId: uni?.id ?? undefined });
+      toast.success(`Default university updated to ${name}`);
     } catch (err: any) {
       toast.error(err.message || 'Unable to update university.');
     }
@@ -158,15 +160,10 @@ export const AccountSettings = () => {
 
             <div className="space-y-2">
               <label className="font-bold text-gray-900 block">Default University</label>
-              <select 
+              <UniversitySelector
                 value={user.university}
                 onChange={handleUniversityChange}
-                className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-[#a14b58] outline-none font-medium"
-              >
-                {universities.map(uni => (
-                  <option key={uni} value={uni}>{uni}</option>
-                ))}
-              </select>
+              />
               <p className="text-[10px] text-gray-400 font-medium italic">This affects the products and deals shown in your feed.</p>
             </div>
 

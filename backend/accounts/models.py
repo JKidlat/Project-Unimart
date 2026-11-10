@@ -7,6 +7,7 @@ Each user has an associated Profile linked to a university.
 
 from django.db import models
 from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin, BaseUserManager
+from django.utils import timezone
 from universities.models import University
 import uuid
 
@@ -64,6 +65,7 @@ class User(AbstractBaseUser, PermissionsMixin):
     is_staff = models.BooleanField(default=False)
     is_verified_student = models.BooleanField(default=False)
     is_email_verified = models.BooleanField(default=False)
+    date_joined = models.DateTimeField(default=timezone.now)
     firebase_uid = models.CharField(
         max_length=128,
         unique=True,
@@ -173,4 +175,51 @@ class KYCSubmission(models.Model):
 
     def __str__(self):
         return f"KYC: {self.email} ({self.status})"
+
+
+class RoleChangeRequest(models.Model):
+    """
+    Requests by registered students to change account role between Buyer and Seller.
+    Never permits requesting or granting Administrator privileges.
+    """
+    ROLE_CHOICES = [
+        ('Buyer', 'Buyer'),
+        ('Seller', 'Seller'),
+    ]
+    STATUS_CHOICES = [
+        ('pending', 'Pending'),
+        ('approved', 'Approved'),
+        ('rejected', 'Rejected'),
+    ]
+
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='role_change_requests',
+    )
+    current_role = models.CharField(max_length=20, choices=ROLE_CHOICES)
+    requested_role = models.CharField(max_length=20, choices=ROLE_CHOICES)
+    reason = models.TextField()
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    admin_note = models.TextField(blank=True, default='')
+    reviewed_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='reviewed_role_requests',
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['user', 'status']),
+            models.Index(fields=['status']),
+        ]
+
+    def __str__(self):
+        return f"RoleChange: {self.user.email} ({self.current_role} -> {self.requested_role}: {self.status})"
+
 

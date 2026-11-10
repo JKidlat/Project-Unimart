@@ -126,7 +126,6 @@ export const Footer = () => {
             >
               Cookie Preferences
             </button>
-            <Link to="/admin/login" className="hover:text-[#f3d7db] text-gray-500 transition-colors">Staff Login</Link>
           </div>
         </div>
       </div>

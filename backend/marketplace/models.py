@@ -41,6 +41,8 @@ class Product(models.Model):
     STATUS_CHOICES = [
         ("pending_approval", "Pending Review"),
         ("live", "Live / Approved"),
+        ("flagged", "Flagged"),
+        ("hidden", "Hidden"),
         ("rejected", "Rejected"),
     ]
 
@@ -106,6 +108,11 @@ class Product(models.Model):
         blank=True,
         null=True,
         help_text="Feedback provided by administrator if rejected"
+    )
+    flag_reason = models.TextField(
+        blank=True,
+        null=True,
+        help_text="Reason provided by moderator if listing is flagged"
     )
 
     is_available = models.BooleanField(

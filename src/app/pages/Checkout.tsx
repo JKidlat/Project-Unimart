@@ -26,7 +26,7 @@ import {
 } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 import { useUser } from '../context/UserContext';
-import { universities } from '../data/mockData';
+import { UniversitySelector } from '../components/common/UniversitySelector';
 import { api } from '../../lib/api';
 import { toast } from 'sonner';
 import { trackOrderInterest } from '../utils/personalization';
@@ -42,7 +42,7 @@ export const Checkout: React.FC = () => {
   const [formData, setFormData] = useState({
     fullName: user?.name || '',
     phone: '',
-    university: user?.university || universities[0],
+    university: user?.university || '',
     hostelRoom: '',
   });
 
@@ -139,15 +139,11 @@ export const Checkout: React.FC = () => {
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-bold text-gray-700">University Institution</label>
-                <select 
+                <UniversitySelector
                   value={formData.university}
-                  onChange={(e) => setFormData({ ...formData, university: e.target.value })}
-                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#a14b58] focus:outline-none"
-                >
-                  {universities.map((uni) => (
-                    <option key={uni} value={uni}>{uni}</option>
-                  ))}
-                </select>
+                  onChange={(name) => setFormData({ ...formData, university: name })}
+                  required
+                />
               </div>
               <div className="sm:col-span-2 space-y-2">
                 <label className="text-sm font-bold text-gray-700">Hall of Residence & Room Number</label>

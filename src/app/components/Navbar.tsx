@@ -301,16 +301,18 @@ export const Navbar = () => {
                 </Link>
               )}
 
-              {/* Creator / Admin Portal Shortcut */}
-              <div className="pt-2 border-t border-gray-100 mt-2">
-                <Link
-                  to="/admin/login"
-                  onClick={() => setIsMenuOpen(false)}
-                  className="block px-3 py-2 text-xs font-bold text-[#a14b58] hover:bg-[#fcf6f7] rounded-lg transition-colors text-center"
-                >
-                  Creator / Admin Portal →
-                </Link>
-              </div>
+              {/* Admin Suite Quick Link (Visible only to authenticated admins) */}
+              {isLoggedIn && (user?.role === 'Admin' || user?.is_staff) && (
+                <div className="pt-2 border-t border-gray-100 mt-2">
+                  <Link
+                    to="/admin"
+                    onClick={() => setIsMenuOpen(false)}
+                    className="block px-3 py-2 text-xs font-bold text-white bg-[#a14b58] hover:bg-[#863b48] rounded-lg transition-colors text-center"
+                  >
+                    Admin Suite →
+                  </Link>
+                </div>
+              )}
             </div>
           </motion.div>
         )}

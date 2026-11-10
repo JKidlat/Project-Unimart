@@ -29,6 +29,24 @@ class IsOwnerOrReadOnly(permissions.BasePermission):
         return owner == request.user
 
 
+class IsPlatformAdmin(permissions.BasePermission):
+    """
+    Strictly restricts access to active platform administrators (`is_staff` or `is_superuser`).
+    Unauthenticated callers trigger 401 Unauthorized; authenticated Buyers/Vendors trigger 403 Forbidden.
+    """
+
+    message = "Access denied. Administrator credentials are required."
+
+    def has_permission(self, request, view):
+        user = request.user
+        return bool(
+            user
+            and user.is_authenticated
+            and getattr(user, 'is_active', False)
+            and (user.is_staff or user.is_superuser)
+        )
+
+
 class IsEmailVerifiedForWrite(permissions.BasePermission):
     """
     Requires verified email ownership before allowing state-mutating marketplace actions

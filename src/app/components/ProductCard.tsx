@@ -183,9 +183,9 @@ export const ProductCard = ({ product, requireAuth }: ProductCardProps) => {
           </div>
 
           {/* Campus Tag */}
-          {product.university && (
+          {((product as any).university_name || product.university || (product as any).seller_details?.university) && (
             <p className="text-[10px] text-gray-400 font-medium mb-2 truncate">
-              {product.university}
+              {(product as any).university_name || product.university || (product as any).seller_details?.university}
             </p>
           )}
 

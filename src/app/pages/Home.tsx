@@ -91,7 +91,7 @@ export const Home = () => {
                 </div>
                 <div className="w-px h-10 bg-gray-200" />
                 <div>
-                  <p className="text-2xl font-bold text-gray-900">10+</p>
+                  <p className="text-2xl font-bold text-gray-900">67</p>
                   <p className="text-sm text-gray-500">Universities</p>
                 </div>
                 <div className="w-px h-10 bg-gray-200" />

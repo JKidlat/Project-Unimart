@@ -53,6 +53,7 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   public render() {
+    const isAdminRoute = typeof window !== 'undefined' && window.location.pathname.startsWith('/admin');
     // If an error was caught, render the recovery card
     if (this.state.hasError) {
       return (
@@ -75,11 +76,11 @@ export class ErrorBoundary extends Component<Props, State> {
               Try Again
             </button>
             <Link
-              to="/admin"
+              to={isAdminRoute ? '/admin' : '/'}
               className="px-4 py-2.5 bg-gray-100 text-gray-700 text-xs font-bold rounded-xl flex items-center gap-2 hover:bg-gray-200 transition-all"
             >
               <Home className="w-4 h-4" />
-              Reload Admin Dashboard
+              {isAdminRoute ? 'Reload Admin Dashboard' : 'Return Home'}
             </Link>
           </div>
         </div>

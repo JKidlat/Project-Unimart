@@ -4,7 +4,9 @@ import {
   Sparkles, ShoppingBag, ArrowRight, Heart, ShoppingCart, 
   Check, RefreshCw, Star, Flame
 } from 'lucide-react';
-import { products as defaultProducts, categories, universities } from '../data/mockData';
+import { products as defaultProducts, categories } from '../data/mockData';
+import { UniversitySelector } from '../components/common/UniversitySelector';
+import type { UniversityOption } from '../../hooks/useUniversities';
 import { ProductCard } from '../components/ProductCard';
 import { useUser } from '../context/UserContext';
 import { useCart } from '../context/CartContext';
@@ -25,6 +27,7 @@ export const Shop = () => {
   const [productList, setProductList] = useState<any[]>(defaultProducts);
   const [selectedCategory, setSelectedCategory] = useState<string>(urlCategory);
   const [selectedUniversity, setSelectedUniversity] = useState<string>('all');
+  const [selectedUniversityObj, setSelectedUniversityObj] = useState<UniversityOption | null>(null);
   const [priceRange, setPriceRange] = useState<number>(10000);
   const [sortBy, setSortBy] = useState<'recommended' | 'price_low' | 'price_high' | 'newest'>('recommended');
   const [loading, setLoading] = useState<boolean>(true);
@@ -95,8 +98,15 @@ export const Shop = () => {
         ? true 
         : (selectedCategory === 'all' || normalizeCategorySlug(p.category) === normalizeCategorySlug(selectedCategory));
 
-      const uniMatch = selectedUniversity === 'all' || 
-        (p.university && p.university.toLowerCase().includes(selectedUniversity.toLowerCase()));
+      const prodUniName = (p.university_name || p.university || '').toLowerCase();
+      const prodUniShort = (p.university_short_name || p.seller_details?.university || '').toLowerCase();
+      const uniMatch =
+        selectedUniversity === 'all' ||
+        (selectedUniversityObj?.id && p.university_id && Number(p.university_id) === Number(selectedUniversityObj.id)) ||
+        prodUniName.includes(selectedUniversity.toLowerCase()) ||
+        (selectedUniversityObj?.short_name &&
+          (prodUniShort === selectedUniversityObj.short_name.toLowerCase() ||
+            prodUniName.includes(selectedUniversityObj.short_name.toLowerCase())));
 
       const priceMatch = Number(p.price || 0) <= priceRange;
 
@@ -105,12 +115,13 @@ export const Shop = () => {
         (p.description || '').toLowerCase().includes(query) ||
         (p.category || '').toLowerCase().includes(query) ||
         (p.category_name || '').toLowerCase().includes(query) ||
-        (p.seller?.name || '').toLowerCase().includes(query) ||
-        (p.university || '').toLowerCase().includes(query);
+        (p.seller?.name || p.seller_details?.name || '').toLowerCase().includes(query) ||
+        prodUniName.includes(query) ||
+        prodUniShort.includes(query);
 
       return categoryMatch && uniMatch && priceMatch && searchMatch;
     });
-  }, [productList, selectedCategory, selectedUniversity, priceRange, searchQuery]);
+  }, [productList, selectedCategory, selectedUniversity, selectedUniversityObj, priceRange, searchQuery]);
 
   // Sort / Personalize products
   const displayedProducts = useMemo(() => {
@@ -256,6 +267,7 @@ export const Shop = () => {
                 onClick={() => {
                   setSelectedCategory('all');
                   setSelectedUniversity('all');
+                  setSelectedUniversityObj(null);
                   setPriceRange(10000);
                   setSearchQuery('');
                 }}
@@ -304,16 +316,15 @@ export const Shop = () => {
             {/* University Filter */}
             <div>
               <h3 className="font-bold text-xs uppercase tracking-wider text-gray-400 mb-3">Campus University</h3>
-              <select 
-                className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#a14b58] focus:outline-none text-xs font-medium"
-                onChange={(e) => setSelectedUniversity(e.target.value)}
+              <UniversitySelector
                 value={selectedUniversity}
-              >
-                <option value="all">All Ghanaian Campuses</option>
-                {universities.map(uni => (
-                  <option key={uni} value={uni}>{uni}</option>
-                ))}
-              </select>
+                onChange={(name, uni) => {
+                  setSelectedUniversity(name);
+                  setSelectedUniversityObj(uni || null);
+                }}
+                includeAllOption
+                compact
+              />
             </div>
 
             {/* Price Range Filter */}
@@ -422,6 +433,7 @@ export const Shop = () => {
                 onClick={() => {
                   setSelectedCategory('all');
                   setSelectedUniversity('all');
+                  setSelectedUniversityObj(null);
                   setPriceRange(10000);
                   setSearchQuery('');
                 }}

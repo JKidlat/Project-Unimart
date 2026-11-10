@@ -426,25 +426,4 @@ export const products = [
   },
 ];
 
-// ==============================================================================
-// 3. SUPPORTED GHANAIAN INSTITUTIONS
-// ==============================================================================
-export const universities = [
-  'University of Ghana (UG)',
-  'Kwame Nkrumah University of Science and Technology (KNUST)',
-  'University of Cape Coast (UCC)',
-  'University of Professional Studies, Accra (UPSA)',
-  'Ghana Communication Technology University (GCTU)',
-  'Ashesi University (Ashesi)',
-  'University of Education, Winneba (UEW)',
-  'Ghana Institute of Management and Public Administration (GIMPA)',
-  'Accra Technical University (ATU)',
-  'Kumasi Technical University (KsTU)',
-  'University of Mines and Technology (UMaT)',
-  'University of Health and Allied Sciences (UHAS)',
-  'University of Media, Arts and Communication (UniMAC)',
-  'Central University (Central)',
-  'Academic City University (ACUC)',
-  'Pentecost University (PU)',
-  'Valley View University (VVU)',
-];
+// Note: Ghanaian institutions are loaded dynamically from the backend database (`/api/universities/`).

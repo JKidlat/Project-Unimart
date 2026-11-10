@@ -28,8 +28,11 @@ class SecurityTestCase(TestCase):
     def setUp(self):
         self.client = APIClient()
 
-        # Create University
-        self.uni = University.objects.create(name="University of Ghana", short_name="UG")
+        # Create / reuse University
+        self.uni, _ = University.objects.get_or_create(
+            short_name="UG",
+            defaults={"name": "University of Ghana"},
+        )
 
         # Create Category
         self.category = Category.objects.create(name="Electronics", slug="electronics")

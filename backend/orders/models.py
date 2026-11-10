@@ -16,6 +16,11 @@ class Order(models.Model):
         ("completed", "Completed"),
         ("cancelled", "Cancelled"),
     ]
+    REFUND_STATUS_CHOICES = [
+        ("none", "None"),
+        ("requested", "Requested"),
+        ("refunded", "Refunded"),
+    ]
 
     buyer = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -39,6 +44,12 @@ class Order(models.Model):
         choices=STATUS_CHOICES,
         default="pending",
         help_text="Current status of the order."
+    )
+    refund_status = models.CharField(
+        max_length=20,
+        choices=REFUND_STATUS_CHOICES,
+        default="none",
+        help_text="Refund processing status."
     )
 
     created_at = models.DateTimeField(auto_now_add=True)

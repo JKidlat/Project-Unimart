@@ -2,32 +2,21 @@ from django.db import transaction
 from django.db.models import Q
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
-from .models import Profile, KYCSubmission
+from .models import Profile, KYCSubmission, RoleChangeRequest
 from universities.models import University
+from universities.catalog import resolve_university_by_text
 
 User = get_user_model()
 
 
 def _resolve_university(university_id=None, university_name=''):
-    """Look up an existing University by ID or name/short_name without failing if formatted with '(CODE)'."""
-    if university_id:
-        uni = University.objects.filter(id=university_id).first()
-        if uni:
-            return uni
-    clean = (university_name or '').strip()
-    if not clean:
-        return None
-    uni = University.objects.filter(Q(name__iexact=clean) | Q(short_name__iexact=clean)).first()
-    if uni:
-        return uni
-    base_name = clean.split('(', 1)[0].strip()
-    if base_name:
-        return University.objects.filter(Q(name__iexact=base_name) | Q(short_name__iexact=base_name)).first()
-    return None
+    """Look up an existing University by ID, exact name/short_name, '(CODE)', or canonical alias."""
+    return resolve_university_by_text(University, university_id=university_id, university_name=university_name)
 
 
 class UserProfileSerializer(serializers.ModelSerializer):
     university_name = serializers.CharField(source='profile.university.name', read_only=True, default='')
+    university_short_name = serializers.CharField(source='profile.university.short_name', read_only=True, default='')
     university_id = serializers.IntegerField(source='profile.university.id', read_only=True, default=None)
     is_vendor = serializers.BooleanField(source='profile.is_vendor', read_only=True, default=False)
     business_name = serializers.CharField(source='profile.business_name', read_only=True, default='')
@@ -43,8 +32,9 @@ class UserProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = [
-            'id', 'email', 'full_name', 'phone_number', 'is_active', 'is_staff',
-            'is_email_verified', 'is_verified_student', 'university_id', 'university_name',
+            'id', 'email', 'full_name', 'phone_number', 'is_active', 'is_staff', 'is_superuser',
+            'is_email_verified', 'is_verified_student', 'date_joined', 'last_login',
+            'university_id', 'university_name', 'university_short_name',
             'is_vendor', 'business_name', 'role', 'profile_pic', 'referral_code',
             'referrals_count', 'orders_count', 'wishlist_count', 'kyc_status',
             'has_firebase_linked',
@@ -109,17 +99,22 @@ class ProfileUpdateSerializer(serializers.Serializer):
             if resolved:
                 profile.university = resolved
 
-        # Prevent unauthorized Buyer -> Seller role elevation via profile updates.
+        # Prevent unauthorized role elevation (Buyer -> Seller or -> Admin) via profile updates.
         # Only existing sellers, KYC-approved users, or staff may hold vendor status.
         requested_vendor = None
-        if 'is_vendor' in validated_data:
-            requested_vendor = bool(validated_data['is_vendor'])
-        elif 'role' in validated_data:
+        if 'role' in validated_data:
             role_lower = str(validated_data['role']).strip().lower()
-            if role_lower == 'seller':
+            if role_lower in ('admin', 'super admin', 'superadmin', 'staff'):
+                if not (user.is_staff or user.is_superuser):
+                    raise serializers.ValidationError({'role': 'Administrator privileges cannot be self-assigned.'})
+            elif role_lower == 'seller':
                 requested_vendor = True
             elif role_lower == 'buyer':
                 requested_vendor = False
+            else:
+                raise serializers.ValidationError({'role': 'Invalid role specified.'})
+        elif 'is_vendor' in validated_data:
+            requested_vendor = bool(validated_data['is_vendor'])
 
         if requested_vendor is not None:
             if not requested_vendor:
@@ -245,3 +240,29 @@ class KYCSubmissionSerializer(serializers.ModelSerializer):
             'submittedAt', 'reviewedAt'
         ]
         read_only_fields = ['id', 'user_email', 'user_name', 'status', 'submittedAt', 'reviewedAt']
+
+
+class KYCAdminReviewSerializer(KYCSubmissionSerializer):
+    """Admin-only serializer allowing status and rejection feedback updates on KYC submissions."""
+    status = serializers.ChoiceField(choices=KYCSubmission.STATUS_CHOICES, required=False)
+
+    class Meta(KYCSubmissionSerializer.Meta):
+        read_only_fields = ['id', 'user_email', 'user_name', 'submittedAt', 'reviewedAt']
+
+
+class RoleChangeRequestSerializer(serializers.ModelSerializer):
+    userEmail = serializers.EmailField(source='user.email', read_only=True)
+    userName = serializers.CharField(source='user.full_name', read_only=True)
+    currentRole = serializers.CharField(source='current_role', read_only=True)
+    requestedRole = serializers.ChoiceField(source='requested_role', choices=[('Buyer', 'Buyer'), ('Seller', 'Seller')])
+    adminNote = serializers.CharField(source='admin_note', required=False, allow_blank=True)
+    createdAt = serializers.DateTimeField(source='created_at', read_only=True)
+    reviewedAt = serializers.DateTimeField(source='reviewed_at', read_only=True)
+
+    class Meta:
+        model = RoleChangeRequest
+        fields = [
+            'id', 'userEmail', 'userName', 'currentRole', 'requestedRole',
+            'reason', 'status', 'adminNote', 'createdAt', 'reviewedAt',
+        ]
+        read_only_fields = ['id', 'userEmail', 'userName', 'currentRole', 'status', 'createdAt', 'reviewedAt']

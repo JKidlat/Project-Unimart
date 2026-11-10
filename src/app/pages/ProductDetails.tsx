@@ -231,7 +231,7 @@ export const ProductDetails = () => {
             <h1 className="text-3xl md:text-4xl font-black text-gray-900 mb-3">{product.name}</h1>
             <div className="flex items-center gap-2 mb-6 text-gray-500 text-sm">
               <MapPin className="w-4 h-4 text-[#a14b58]" />
-              <span className="font-semibold text-gray-700">{product.university || 'Campus wide'}</span>
+              <span className="font-semibold text-gray-700">{product.university_name || product.university || 'Campus wide'}</span>
             </div>
             <div className="flex items-center gap-4 flex-wrap">
               <span className="text-4xl font-black text-gray-900">GH₵{Number(product.price).toLocaleString()}</span>

@@ -97,6 +97,7 @@ urlpatterns = [
     path('', api_root, name='root'),
     path('api/', api_root, name='api-root'),
     path('admin/', admin.site.urls),
+    path('api/admin/', include('core.admin_urls')),
     path('api/auth/', include('accounts.urls')),
     path("api/", include("marketplace.urls")),
     path("api/orders/", include("orders.urls")),

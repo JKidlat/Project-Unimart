@@ -21,6 +21,7 @@ class ProductSerializer(serializers.ModelSerializer):
     condition = serializers.CharField(required=False, default='Like New')
     category_name = serializers.CharField(source='category.name', read_only=True, default='')
 
+    category = serializers.CharField(source='category.slug', read_only=True, default='others')
     category_id = serializers.PrimaryKeyRelatedField(
         queryset=Category.objects.all(), 
         source='category', 
@@ -28,6 +29,7 @@ class ProductSerializer(serializers.ModelSerializer):
         allow_null=True
     )
     university_name = serializers.CharField(source='university.name', read_only=True, default='')
+    university_short_name = serializers.CharField(source='university.short_name', read_only=True, default='')
     university_id = serializers.PrimaryKeyRelatedField(
         queryset=University.objects.all(), 
         source='university', 
@@ -40,12 +42,15 @@ class ProductSerializer(serializers.ModelSerializer):
         model = Product
         fields = [
             'id', 'title', 'name', 'description', 'price', 'old_price', 'oldPrice',
-            'condition', 'image', 'product_type', 'is_available', 'status', 'rejection_reason',
-            'category_id', 'category_name', 'university_id', 'university_name', 'seller_details',
+            'condition', 'image', 'product_type', 'is_available', 'status',
+            'rejection_reason', 'flag_reason',
+            'category', 'category_id', 'category_name',
+            'university_id', 'university_name', 'university_short_name', 'seller_details',
             'average_rating', 'created_at', 'updated_at'
         ]
         read_only_fields = [
-            'id', 'created_at', 'updated_at', 'status', 'is_available', 'rejection_reason'
+            'id', 'created_at', 'updated_at', 'status', 'is_available',
+            'rejection_reason', 'flag_reason'
         ]
 
     def get_average_rating(self, obj):

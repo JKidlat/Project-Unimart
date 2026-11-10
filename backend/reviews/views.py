@@ -73,7 +73,7 @@ class ReviewListView(generics.ListAPIView):
         
         Supports filtering by product ID via query parameter.
         """
-        queryset = Review.objects.all().select_related(
+        queryset = Review.objects.filter(moderation_status='approved').select_related(
             'user',
             'product'
         )

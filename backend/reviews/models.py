@@ -26,6 +26,12 @@ class Review(models.Model):
         (4, '4 - Very Good'),
         (5, '5 - Excellent'),
     ]
+    MODERATION_CHOICES = [
+        ('pending', 'Pending'),
+        ('approved', 'Approved'),
+        ('flagged', 'Flagged'),
+        ('removed', 'Removed'),
+    ]
 
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -47,6 +53,21 @@ class Review(models.Model):
         blank=True,
         null=True,
         help_text="Optional comment describing the review."
+    )
+    moderation_status = models.CharField(
+        max_length=20,
+        choices=MODERATION_CHOICES,
+        default='approved',
+        help_text="Administrative moderation status."
+    )
+    flag_reason = models.TextField(
+        blank=True,
+        null=True,
+        help_text="Reason if review was flagged or removed."
+    )
+    report_count = models.PositiveIntegerField(
+        default=0,
+        help_text="Number of moderation reports against this review."
     )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(

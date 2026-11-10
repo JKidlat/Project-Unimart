@@ -27,8 +27,7 @@
 
 import { 
   products as initialProducts, 
-  categories as initialCategories, 
-  universities as initialUniversities 
+  categories as initialCategories
 } from '../app/data/mockData';
 
 // Base URL for the Django REST API backend (configurable via environment variable)
@@ -413,18 +412,6 @@ async function handleMockFallback(endpoint: string, options: RequestInit = {}): 
     return initialCategories;
   }
 
-  // --- Fallback: Universities List ---
-  if (endpoint.includes('/universities')) {
-    return initialUniversities.map((uni, idx) => {
-      const match = uni.match(/^(.*?)\s*\((.*?)\)$/);
-      return {
-        id: idx + 1,
-        name: match ? match[1] : uni,
-        short_name: match ? match[2] : uni
-      };
-    });
-  }
-
   // --- Fallback 6: Orders Management & Status Tracking ---
   if (endpoint.includes('/orders')) {
     let orders: any[] = [];
@@ -618,13 +605,15 @@ export async function apiRequest<T = any>(
 
     return await response.json();
   } catch (err: any) {
-    // If backend is offline or network fails, fall back to browser localStorage mock store
+    // If backend is offline or network fails, never serve mock fallbacks for privileged/database endpoints
     if (err.name === 'TypeError' || err.message?.includes('Failed to fetch') || err.message?.includes('NetworkError')) {
       if (
-        endpoint.includes('/auth/google') ||
-        endpoint.includes('/auth/password-reset') ||
-        endpoint.includes('/auth/verify-email') ||
-        endpoint.includes('/auth/resend-verification')
+        endpoint.startsWith('/admin') ||
+        endpoint.includes('/admin/') ||
+        endpoint.includes('/auth/') ||
+        endpoint.includes('/kyc') ||
+        endpoint.includes('/universities') ||
+        endpoint.includes('status=all')
       ) {
         throw new Error('Unable to reach the Unimart server. Please wait a moment and try again.');
       }

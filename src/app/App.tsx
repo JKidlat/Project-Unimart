@@ -24,7 +24,7 @@
  */
 
 import React, { useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, useLocation, Link } from 'react-router';
+import { BrowserRouter as Router, Routes, Route, useLocation, Link, Navigate } from 'react-router';
 import { Toaster } from 'sonner';
 import { 
   Home as HomeIcon, 
@@ -94,6 +94,7 @@ import { OrdersManagement } from './pages/Admin/OrdersManagement';
 import { AdApprovals } from './pages/Admin/AdApprovals';
 import { KYCManagement } from './pages/Admin/KYCManagement';
 import { RoleChangeApprovals } from './pages/Admin/RoleChangeApprovals';
+import { UniversitiesManagement } from './pages/Admin/UniversitiesManagement';
 
 // ============================================================================
 // Help & Support Pages
@@ -233,7 +234,7 @@ const AppContent = () => {
           <Route path="/admin/signin" element={<AdminLogin />} />
           <Route path="/admin" element={<ProtectedRoute allowedRoles={['Admin']}><AdminDashboard /></ProtectedRoute>} />
           <Route path="/admin/dashboard" element={<ProtectedRoute allowedRoles={['Admin']}><AdminDashboard /></ProtectedRoute>} />
-          <Route path="/dashboard" element={<ProtectedRoute allowedRoles={['Admin']}><AdminDashboard /></ProtectedRoute>} />
+          <Route path="/dashboard" element={<ProtectedRoute allowedRoles={['Admin']}><Navigate to="/admin" replace /></ProtectedRoute>} />
           <Route path="/admin/users" element={<ProtectedRoute allowedRoles={['Admin']}><UserManagement /></ProtectedRoute>} />
           <Route path="/admin/activity" element={<ProtectedRoute allowedRoles={['Admin']}><LiveActivity /></ProtectedRoute>} />
           <Route path="/admin/products" element={<ProtectedRoute allowedRoles={['Admin']}><ProductManagement /></ProtectedRoute>} />
@@ -242,6 +243,7 @@ const AppContent = () => {
           <Route path="/admin/role-requests" element={<ProtectedRoute allowedRoles={['Admin']}><RoleChangeApprovals /></ProtectedRoute>} />
           <Route path="/admin/reviews" element={<ProtectedRoute allowedRoles={['Admin']}><ReviewsModeration /></ProtectedRoute>} />
           <Route path="/admin/orders" element={<ProtectedRoute allowedRoles={['Admin']}><OrdersManagement /></ProtectedRoute>} />
+          <Route path="/admin/universities" element={<ProtectedRoute allowedRoles={['Admin']}><UniversitiesManagement /></ProtectedRoute>} />
           
           {/* ============================================================== */}
           {/* 6. USER MESSAGES & SUPPORT CENTER                             */}

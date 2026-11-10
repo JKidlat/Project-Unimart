@@ -32,7 +32,7 @@ export const Profile = () => {
   };
 
   const isSeller = user.role === 'Seller';
-  const isAdmin = user.role === 'Admin';
+  const isAdmin = user.role === 'Admin' || Boolean(user.is_staff);
 
   const menuItems = [
     ...(isSeller ? [{ icon: Store, label: 'Seller Dashboard (Post Ads & Orders)', path: '/seller', highlight: true }] : []),

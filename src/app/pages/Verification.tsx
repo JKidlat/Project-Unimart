@@ -1,14 +1,14 @@
 import React, { useState } from 'react';
 import { ShieldCheck, Upload, CheckCircle2, AlertCircle, FileText } from 'lucide-react';
 import { useUser } from '../context/UserContext';
-import { universities } from '../data/mockData';
+import { UniversitySelector } from '../components/common/UniversitySelector';
 import { toast } from 'sonner';
 
 export const Verification: React.FC = () => {
-  const { user, updateProfile } = useUser();
+  const { user } = useUser();
   const [submitted, setSubmitted] = useState(false);
   const [studentId, setStudentId] = useState('');
-  const [selectedUni, setSelectedUni] = useState(user?.university || universities[0]);
+  const [selectedUni, setSelectedUni] = useState(user?.university || '');
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -49,15 +49,11 @@ export const Verification: React.FC = () => {
         <form onSubmit={handleSubmit} className="bg-white rounded-3xl p-8 border border-gray-100 shadow-sm space-y-6">
           <div className="space-y-2">
             <label className="text-sm font-bold text-gray-700">University Institution</label>
-            <select
+            <UniversitySelector
               value={selectedUni}
-              onChange={(e) => setSelectedUni(e.target.value)}
-              className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#a14b58] focus:outline-none"
-            >
-              {universities.map((u) => (
-                <option key={u} value={u}>{u}</option>
-              ))}
-            </select>
+              onChange={(name) => setSelectedUni(name)}
+              required
+            />
           </div>
 
           <div className="space-y-2">

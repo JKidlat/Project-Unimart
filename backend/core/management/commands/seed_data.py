@@ -14,6 +14,7 @@ from django.db import transaction
 from django.contrib.auth import get_user_model
 from accounts.models import Profile
 from universities.models import University
+from universities.catalog import sync_ghana_universities
 from marketplace.models import Category, Product
 
 User = get_user_model()
@@ -26,86 +27,10 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         self.stdout.write(self.style.NOTICE("Starting database seeding..."))
 
-        # 1. Seed Universities
-        universities_data = [
-            {"name": "Academic City University", "short_name": "ACUC"},
-            {"name": "Accra Business School", "short_name": "ABS"},
-            {"name": "Accra Institute of Technology", "short_name": "AIT"},
-            {"name": "Accra Metropolitan University", "short_name": "AMU"},
-            {"name": "Accra Technical University", "short_name": "ATU"},
-            {"name": "African University College of Communications", "short_name": "AUCC"},
-            {"name": "Akenten Appiah-Menka University of Skills Training and Entrepreneurial Development", "short_name": "AAMUSTED"},
-            {"name": "Akrofi-Christaller Institute of Theology, Mission and Culture", "short_name": "ACI"},
-            {"name": "All Nations University", "short_name": "ANU"},
-            {"name": "Anglican University College of Technology", "short_name": "ANGUTECH"},
-            {"name": "Ashesi University", "short_name": "Ashesi"},
-            {"name": "Bolgatanga Technical University", "short_name": "BTU"},
-            {"name": "C. K. Tedam University of Technology and Applied Sciences", "short_name": "CKT-UTAS"},
-            {"name": "Cape Coast Technical University", "short_name": "CCTU"},
-            {"name": "Catholic University of Ghana", "short_name": "CUG"},
-            {"name": "Central University", "short_name": "Central"},
-            {"name": "Christian Service University", "short_name": "CSU"},
-            {"name": "Christian University College", "short_name": "CUC"},
-            {"name": "Dominion University College", "short_name": "DUC"},
-            {"name": "Dr. Hilla Limann Technical University", "short_name": "DHLTU"},
-            {"name": "Ensign Global University", "short_name": "Ensign"},
-            {"name": "Evangelical Presbyterian University College", "short_name": "EPUC"},
-            {"name": "Family Health University", "short_name": "FHUC"},
-            {"name": "Garden City University", "short_name": "GCUC"},
-            {"name": "Ghana Christian University College", "short_name": "GCUC-Ghana"},
-            {"name": "Ghana Communication Technology University", "short_name": "GCTU"},
-            {"name": "Ghana Institute of Management and Public Administration", "short_name": "GIMPA"},
-            {"name": "Heritage Christian University", "short_name": "HCUC"},
-            {"name": "Ho Technical University", "short_name": "HTU"},
-            {"name": "KAAF University", "short_name": "KAAF"},
-            {"name": "Klintaps University College of Health and Allied Sciences", "short_name": "KUCoHAS"},
-            {"name": "Knutsford University", "short_name": "Knutsford"},
-            {"name": "Koforidua Technical University", "short_name": "KTU"},
-            {"name": "Kumasi Technical University", "short_name": "KsTU"},
-            {"name": "Kwame Nkrumah University of Science and Technology", "short_name": "KNUST"},
-            {"name": "Lancaster University Ghana", "short_name": "Lancaster"},
-            {"name": "Maranatha University College", "short_name": "MUC"},
-            {"name": "Methodist University Ghana", "short_name": "MUG"},
-            {"name": "Mountcrest University College", "short_name": "MUCG"},
-            {"name": "Nobel International Business University", "short_name": "NIBS"},
-            {"name": "Pentecost University", "short_name": "PU"},
-            {"name": "Presbyterian University", "short_name": "PUG"},
-            {"name": "Radford University College", "short_name": "RUC"},
-            {"name": "Regent University College of Science and Technology", "short_name": "Regent"},
-            {"name": "Regentropfen University College", "short_name": "RUCG"},
-            {"name": "Regional Maritime University", "short_name": "RMU"},
-            {"name": "S. D. Dombo University of Business and Integrated Development Studies", "short_name": "SDD-UBIDS"},
-            {"name": "Spiritan University College", "short_name": "SUC"},
-            {"name": "Sunyani Technical University", "short_name": "STU"},
-            {"name": "Takoradi Technical University", "short_name": "TTU"},
-            {"name": "Tamale Technical University", "short_name": "TaTU"},
-            {"name": "Trinity Theological Seminary", "short_name": "TTS"},
-            {"name": "University for Development Studies", "short_name": "UDS"},
-            {"name": "University of Cape Coast", "short_name": "UCC"},
-            {"name": "University of Education, Winneba", "short_name": "UEW"},
-            {"name": "University of Energy and Natural Resources", "short_name": "UENR"},
-            {"name": "University of Environment and Sustainable Development", "short_name": "UESD"},
-            {"name": "University of Ghana", "short_name": "UG"},
-            {"name": "University of Gold Coast", "short_name": "UGC"},
-            {"name": "University of Health and Allied Sciences", "short_name": "UHAS"},
-            {"name": "University of Media, Arts and Communication", "short_name": "UniMAC"},
-            {"name": "University of Mines and Technology", "short_name": "UMaT"},
-            {"name": "University of Professional Studies, Accra", "short_name": "UPSA"},
-            {"name": "Valley View University", "short_name": "VVU"},
-            {"name": "West End University College", "short_name": "WEUC"},
-            {"name": "Wisconsin International University College, Ghana", "short_name": "WIUC"},
-            {"name": "Zenith University College", "short_name": "ZUC"},
-        ]
-
-        uni_map = {}
-        for u_data in universities_data:
-            uni, created = University.objects.get_or_create(
-                short_name=u_data["short_name"],
-                defaults={"name": u_data["name"]}
-            )
-            uni_map[u_data["short_name"]] = uni
-            status = "Created" if created else "Exists"
-            self.stdout.write(f"  [University] {status}: {uni.name} ({uni.short_name})")
+        # 1. Seed & Reconcile Canonical 67 Ghanaian Universities
+        uni_stats = sync_ghana_universities()
+        self.stdout.write(f"  [Universities] Synced 67 canonical institutions: {uni_stats}")
+        uni_map = {uni.short_name: uni for uni in University.objects.all()}
 
         # 2. Seed Categories (7 Official Categories)
         categories_data = [

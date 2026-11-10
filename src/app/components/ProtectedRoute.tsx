@@ -2,42 +2,37 @@
  * ==============================================================================
  * ROUTE SECURITY GUARD (ProtectedRoute.tsx)
  * ==============================================================================
- * This component acts as a security barrier around routes that require login
- * or specific privileges (e.g. Buyer, Seller, or Admin).
- *
- * How it works:
- * 1. Loading State:
- *    - While UserContext is verifying the stored JWT session, it displays a smooth
- *      spinner so users don't see brief flicker redirects.
- * 2. Admin Protection:
- *    - If `allowedRoles` includes 'Admin', it verifies that the user is an admin
- *      (`user.role === 'Admin'` or `user.is_staff`).
- *    - If unauthenticated, it redirects specifically to `/admin/login`.
- * 3. General Authentication Protection:
- *    - If user is not logged in, it alerts them with a toast message and redirects
- *      to `/signin`, storing the current URL in `location.state.from` so they return
- *      to the page they intended to visit after signing in.
- * 4. Role Hierarchy Protection:
- *    - If a Buyer tries to visit a Seller-only URL without being verified,
- *      it blocks access and redirects safely to the homepage.
- *
- * Example usage:
- * <Route path="/orders" element={<ProtectedRoute><Orders /></ProtectedRoute>} />
- * <Route path="/admin" element={<ProtectedRoute allowedRoles={['Admin']}><AdminDashboard /></ProtectedRoute>} />
+ * Enforces strict client-side route protection matching backend authorization:
+ * - Shows loading state while verifying JWT session against `/auth/me/` (prevents
+ *   rendering any protected/admin UI prior to role verification).
+ * - Unauthenticated access to `/admin*` redirects to `/admin/login`.
+ * - Authenticated Buyer/Seller attempting to open `/admin*` is denied and
+ *   redirected to their appropriate dashboard (`'/'` or `'/seller'`).
+ * - Unauthenticated access to Buyer/Seller routes redirects to `/signin`.
  * ==============================================================================
  */
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Navigate, useLocation } from 'react-router';
 import { useUser, type UserRole } from '../context/UserContext';
 import { toast } from 'sonner';
 
-// Props passed to ProtectedRoute
 interface ProtectedRouteProps {
-  children: React.ReactNode;   // The child component/page to render if authorized
-  allowedRoles?: UserRole[];   // Optional whitelist of allowed roles (e.g. ['Seller'] or ['Admin'])
-  requireAuth?: boolean;       // Defaults to true
+  children: React.ReactNode;
+  allowedRoles?: UserRole[];
+  requireAuth?: boolean;
 }
+
+const DeniedRedirect: React.FC<{ to: string; message: string; state?: any }> = ({
+  to,
+  message,
+  state,
+}) => {
+  useEffect(() => {
+    toast.error(message);
+  }, [message]);
+  return <Navigate to={to} state={state} replace />;
+};
 
 export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   children,
@@ -47,7 +42,6 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   const { user, isLoggedIn, isLoading } = useUser();
   const location = useLocation();
 
-  // 1. Show spinner while verifying user session on app startup
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -56,27 +50,42 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     );
   }
 
-  // 2. Specific guard for Admin suite routes (/admin/*)
   if (allowedRoles?.includes('Admin')) {
-    const isAdmin = Boolean(user && (user.is_staff || user.role === 'Admin' || (user.role as string) === 'Super Admin'));
-    if (!isLoggedIn || !isAdmin) {
+    if (!isLoggedIn || !user) {
       return <Navigate to="/admin/login" state={{ from: location }} replace />;
+    }
+    const isAdmin = Boolean(user.is_staff || user.is_superuser || user.role === 'Admin');
+    if (!isAdmin) {
+      const destination = user.role === 'Seller' ? '/seller' : '/';
+      return (
+        <DeniedRedirect
+          to={destination}
+          message="Access denied. Administrator privileges are required."
+        />
+      );
     }
     return <>{children}</>;
   }
 
-  // 3. General user authentication check (must be logged in)
   if (requireAuth && !isLoggedIn) {
-    toast.error("Please sign in to access this page");
-    return <Navigate to="/signin" state={{ from: location }} replace />;
+    return (
+      <DeniedRedirect
+        to="/signin"
+        state={{ from: location }}
+        message="Please sign in to access this page."
+      />
+    );
   }
 
-  // 4. Role mismatch check (e.g. Buyer trying to open Seller Studio directly)
   if (allowedRoles && user && !allowedRoles.includes(user.role)) {
-    toast.error("Access denied. Insufficient privileges.");
-    return <Navigate to="/" replace />;
+    const destination = user.is_staff || user.role === 'Admin' ? '/admin' : user.role === 'Seller' ? '/seller' : '/';
+    return (
+      <DeniedRedirect
+        to={destination}
+        message="Access denied. Insufficient privileges."
+      />
+    );
   }
 
-  // 5. User meets all security checks — render the requested page
   return <>{children}</>;
 };

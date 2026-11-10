@@ -37,7 +37,10 @@ class AuthFlowsTests(TestCase):
     def setUp(self):
         cache.clear()
         self.client = APIClient()
-        self.university = University.objects.create(name="University of Ghana", short_name="UG")
+        self.university, _ = University.objects.get_or_create(
+            short_name="UG",
+            defaults={"name": "University of Ghana"},
+        )
 
     def tearDown(self):
         cache.clear()
@@ -380,7 +383,10 @@ class RealFirebasePublicCertVerificationTests(TestCase):
     def setUp(self):
         cache.clear()
         self.client = APIClient()
-        self.university = University.objects.create(name="KNUST", short_name="KNUST")
+        self.university, _ = University.objects.get_or_create(
+            short_name="KNUST",
+            defaults={"name": "Kwame Nkrumah University of Science and Technology"},
+        )
 
     def tearDown(self):
         cache.clear()

@@ -2,11 +2,12 @@
 Marketplace views for products and categories.
 """
 
-from rest_framework import generics, permissions, status
-from rest_framework.response import Response
-from rest_framework.pagination import PageNumberPagination
-from rest_framework.filters import SearchFilter, OrderingFilter
 from django.db.models import Q
+from rest_framework import generics, permissions, status
+from rest_framework.exceptions import NotAuthenticated, PermissionDenied
+from rest_framework.filters import SearchFilter, OrderingFilter
+from rest_framework.pagination import PageNumberPagination
+from rest_framework.response import Response
 from .models import Product, Category, WishlistItem
 from .serializers import ProductSerializer, CategorySerializer, WishlistItemSerializer
 
@@ -45,12 +46,19 @@ class ProductListCreateView(generics.ListCreateAPIView):
     def get_queryset(self):
         status_param = self.request.query_params.get('status')
         user = self.request.user
+        is_admin = bool(user and user.is_authenticated and (user.is_staff or user.is_superuser))
 
-        if status_param and (getattr(user, 'is_staff', False) or getattr(user, 'is_superuser', False)):
+        if status_param and status_param != 'live':
+            if not user or not user.is_authenticated:
+                raise NotAuthenticated("Authentication required to query non-public product queues.")
+            if not is_admin:
+                raise PermissionDenied("Administrator privileges required to query non-public product queues.")
             if status_param == 'all':
                 queryset = Product.objects.all()
             else:
                 queryset = Product.objects.filter(status=status_param)
+        elif status_param and is_admin:
+            queryset = Product.objects.filter(status=status_param)
         else:
             # Public shop only shows approved live products
             queryset = Product.objects.filter(status='live', is_available=True)
@@ -137,12 +145,17 @@ class ProductDetailView(generics.RetrieveUpdateDestroyAPIView):
             is_avail_val = self.request.data.get('is_available')
             rejection_reason_val = self.request.data.get('rejection_reason') or self.request.data.get('rejectionReason')
             kwargs = {}
-            if status_val in ['pending_approval', 'live', 'rejected']:
+            if status_val in ['pending_approval', 'live', 'flagged', 'hidden', 'rejected']:
                 kwargs['status'] = status_val
+                if is_avail_val is None:
+                    kwargs['is_available'] = (status_val == 'live')
             if is_avail_val is not None:
                 kwargs['is_available'] = bool(is_avail_val)
             if rejection_reason_val is not None:
                 kwargs['rejection_reason'] = rejection_reason_val
+            flag_reason_val = self.request.data.get('flag_reason') or self.request.data.get('flagReason')
+            if flag_reason_val is not None:
+                kwargs['flag_reason'] = flag_reason_val
             serializer.save(**kwargs)
         else:
             # Regular sellers updating listing details:
