@@ -52,13 +52,21 @@ def verify_email_verification_token(token: str):
         return None
 
 
-def send_transactional_email(to_email: str, subject: str, html_body: str, text_body: str) -> bool:
+def send_transactional_email_detailed(
+    to_email: str, subject: str, html_body: str, text_body: str
+) -> tuple[bool, str]:
     """
     Send a transactional email via the Resend HTTPS API.
-    Returns True if accepted by Resend, or logs cleanly in local dev when unconfigured.
+    Returns (True, "") if accepted by Resend, or (False, safe_error_reason) otherwise.
     """
-    api_key = getattr(settings, "RESEND_API_KEY", "").strip()
-    from_email = getattr(settings, "DEFAULT_FROM_EMAIL", "Unimart <onboarding@resend.dev>").strip()
+    api_key = getattr(settings, "RESEND_API_KEY", "").strip().strip('"').strip("'")
+    from_email = (
+        getattr(settings, "DEFAULT_FROM_EMAIL", "Unimart <onboarding@resend.dev>")
+        .strip()
+        .strip('"')
+        .strip("'")
+        or "Unimart <onboarding@resend.dev>"
+    )
 
     if not api_key:
         logger.warning(
@@ -67,7 +75,7 @@ def send_transactional_email(to_email: str, subject: str, html_body: str, text_b
             subject,
             text_body,
         )
-        return False
+        return False, "RESEND_API_KEY is not configured on the backend."
 
     payload = json.dumps({
         "from": from_email,
@@ -90,22 +98,37 @@ def send_transactional_email(to_email: str, subject: str, html_body: str, text_b
 
     try:
         with urllib.request.urlopen(request, timeout=10) as response:
-            return 200 <= response.status < 300
+            if 200 <= response.status < 300:
+                return True, ""
+            return False, f"Resend returned HTTP {response.status}."
     except urllib.error.HTTPError as exc:
         err_body = exc.read().decode("utf-8", errors="ignore")
-        logger.error("Resend API error (%s) sending to %s: %s", exc.code, to_email, err_body)
-        return False
+        logger.error("Resend API error (%s) sending to %s from %s: %s", exc.code, to_email, from_email, err_body)
+        safe_msg = f"Email provider error ({exc.code})."
+        try:
+            parsed = json.loads(err_body)
+            if isinstance(parsed, dict) and parsed.get("message"):
+                safe_msg = str(parsed["message"])
+        except Exception:
+            pass
+        return False, safe_msg
     except Exception as exc:
         logger.error("Unexpected error sending email to %s: %s", to_email, exc)
-        return False
+        return False, "Unable to contact email delivery provider."
+
+
+def send_transactional_email(to_email: str, subject: str, html_body: str, text_body: str) -> bool:
+    """Compatibility wrapper returning boolean delivery success."""
+    ok, _ = send_transactional_email_detailed(to_email, subject, html_body, text_body)
+    return ok
 
 
 def _get_frontend_base_url() -> str:
     return getattr(settings, "FRONTEND_URL", "https://project-unimart.vercel.app").rstrip("/")
 
 
-def send_verification_email(user) -> bool:
-    """Generate a verification link and send it to the user's email address."""
+def send_verification_email_detailed(user) -> tuple[bool, str]:
+    """Generate a verification link, send it, and return (sent, error_detail)."""
     token = make_email_verification_token(user)
     verify_url = f"{_get_frontend_base_url()}/verify-email?{urlencode({'token': token})}"
     display_name = html.escape(user.full_name or user.email.split("@")[0])
@@ -135,7 +158,13 @@ def send_verification_email(user) -> bool:
         f"Welcome to Unimart, {user.full_name or user.email}!\n\n"
         f"Verify your email address using this link (expires in 72 hours):\n{verify_url}\n"
     )
-    return send_transactional_email(user.email, subject, html_body, text_body)
+    return send_transactional_email_detailed(user.email, subject, html_body, text_body)
+
+
+def send_verification_email(user) -> bool:
+    """Generate a verification link and send it to the user's email address."""
+    ok, _ = send_verification_email_detailed(user)
+    return ok
 
 
 def send_password_reset_email(user) -> bool:

@@ -100,6 +100,30 @@ class AuthFlowsTests(TestCase):
         self.assertEqual(resend_res.status_code, status.HTTP_200_OK)
         self.assertTrue(resend_res.data["already_verified"])
 
+    def test_resend_surfaces_provider_error_instead_of_silent_success(self):
+        import io
+        import urllib.error
+        err_stream = io.BytesIO(b'{"message": "Domain is not verified on Resend"}')
+        http_err = urllib.error.HTTPError("https://api.resend.com/emails", 403, "Forbidden", {}, err_stream)
+        with patch("accounts.emails.urllib.request.urlopen", side_effect=http_err):
+            reg_res = self.client.post(
+                "/api/auth/register/",
+                {"email": "failmail@st.ug.edu.gh", "password": "StrongPassword123!"},
+                format="json",
+            )
+            self.assertEqual(reg_res.status_code, status.HTTP_201_CREATED)
+            self.assertFalse(reg_res.data["verification_email_sent"])
+            self.assertIn("Domain is not verified", reg_res.data["verification_email_error"])
+
+            err_stream2 = io.BytesIO(b'{"message": "Domain is not verified on Resend"}')
+            http_err2 = urllib.error.HTTPError("https://api.resend.com/emails", 403, "Forbidden", {}, err_stream2)
+            with patch("accounts.emails.urllib.request.urlopen", side_effect=http_err2):
+                self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {reg_res.data['tokens']['access']}")
+                resend_fail = self.client.post("/api/auth/resend-verification/", {}, format="json")
+                self.assertEqual(resend_fail.status_code, status.HTTP_502_BAD_GATEWAY)
+                self.assertFalse(resend_fail.data["sent"])
+                self.assertIn("Domain is not verified", resend_fail.data["error"])
+
     @patch("accounts.emails.urllib.request.urlopen", return_value=FakeHTTPResponse(200))
     def test_password_reset_flow_and_token_single_use(self, mock_urlopen):
         user = User.objects.create_user(email="resetme@ug.edu.gh", password="OldPassword123!")

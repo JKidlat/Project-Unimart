@@ -276,8 +276,11 @@ FRONTEND_URL = os.environ.get(
 ).rstrip('/')
 
 # Email Delivery via Resend HTTPS API (Port 443; compatible with Render Free tier)
-RESEND_API_KEY = os.environ.get('RESEND_API_KEY', '')
-DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'Unimart <onboarding@resend.dev>')
+RESEND_API_KEY = os.environ.get('RESEND_API_KEY', '').strip().strip('"').strip("'")
+DEFAULT_FROM_EMAIL = (
+    os.environ.get('DEFAULT_FROM_EMAIL', 'Unimart <onboarding@resend.dev>').strip().strip('"').strip("'")
+    or 'Unimart <onboarding@resend.dev>'
+)
 EMAIL_VERIFICATION_MAX_AGE = int(os.environ.get('EMAIL_VERIFICATION_MAX_AGE', 60 * 60 * 24 * 3))  # 72 hours
 PASSWORD_RESET_TIMEOUT = int(os.environ.get('PASSWORD_RESET_TIMEOUT', 60 * 60))  # 1 hour
 

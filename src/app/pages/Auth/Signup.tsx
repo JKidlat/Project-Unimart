@@ -131,7 +131,17 @@ export const Signup = () => {
         });
       }
 
-      toast.success("Account created! Please check your email inbox to verify your address.", { duration: 6000 });
+      if ((newUser as any)?._verificationEmailSent === false) {
+        const reason = (newUser as any)?._verificationEmailError;
+        toast.warning(
+          reason
+            ? `Account created, but verification email failed: ${reason}`
+            : "Account created, but the verification email could not be delivered yet. Click Resend Verification in the top banner.",
+          { duration: 8000 }
+        );
+      } else {
+        toast.success("Account created! Please check your email inbox to verify your address.", { duration: 6000 });
+      }
       navigate(resolveUserDashboardPath(newUser));
     } catch (err: any) {
       toast.error(err.message || "Failed to create account. Please try again.");

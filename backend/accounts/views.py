@@ -23,6 +23,7 @@ from .authentication import FirebaseAccountError, resolve_existing_firebase_user
 from .emails import (
     send_password_reset_email,
     send_verification_email,
+    send_verification_email_detailed,
     verify_email_verification_token,
 )
 from .models import KYCSubmission
@@ -94,12 +95,15 @@ class RegisterView(generics.CreateAPIView):
         serializer.is_valid(raise_exception=True)
         user = serializer.save()
 
-        verification_sent = send_verification_email(user)
+        verification_sent, verification_error = send_verification_email_detailed(user)
+        extra = {'verification_email_sent': verification_sent}
+        if not verification_sent and verification_error:
+            extra['verification_email_error'] = verification_error
         return _issue_jwt_response(
             user,
             'Account created successfully. Please verify your email address.',
             status_code=status.HTTP_201_CREATED,
-            verification_email_sent=verification_sent,
+            **extra,
         )
 
 
@@ -203,10 +207,18 @@ class ResendVerificationEmailView(generics.GenericAPIView):
                 'already_verified': True,
             })
 
-        sent = send_verification_email(user)
+        sent, detail = send_verification_email_detailed(user)
+        if not sent:
+            return Response(
+                {
+                    'error': f'Failed to send verification email: {detail}',
+                    'sent': False,
+                },
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
         return Response({
-            'message': 'Verification email sent. Please check your inbox.' if sent else 'Verification email queued; please verify email configuration.',
-            'sent': sent,
+            'message': 'Verification email sent. Please check your inbox.',
+            'sent': True,
         })
 
 

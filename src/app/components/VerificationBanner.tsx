@@ -22,6 +22,10 @@ export const VerificationBanner: React.FC = () => {
         toast.success('Your email is already verified!');
         return;
       }
+      if (res.sent === false) {
+        toast.error(res.error || res.message || 'Verification email could not be delivered.');
+        return;
+      }
       setSent(true);
       toast.success(res.message || 'Verification email sent! Please check your inbox.');
     } catch (err: any) {

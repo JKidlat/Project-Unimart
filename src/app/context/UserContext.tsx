@@ -258,13 +258,17 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
         referral_code: formData.referral_code || formData.referralCode || '',
       });
 
-      return persistAuthResponse(res, {
+      const profile = persistAuthResponse(res, {
         name: formData.fullName || formData.name,
         email: formData.email,
         university: formData.university || 'University of Ghana (UG)',
         role: (formData.role as UserRole) || 'Buyer',
         is_email_verified: false,
         businessName: formData.businessName || undefined,
+      });
+      return Object.assign(profile, {
+        _verificationEmailSent: res?.verification_email_sent,
+        _verificationEmailError: res?.verification_email_error,
       });
     } catch (err: any) {
       throw err;
