@@ -552,6 +552,7 @@ const PUBLIC_AUTH_PATHS = [
   '/auth/login',
   '/auth/register',
   '/auth/google',
+  '/auth/google/link',
   '/auth/verify-email',
   '/auth/password-reset',
   '/auth/token/refresh',
@@ -608,7 +609,11 @@ export async function apiRequest<T = any>(
         const firstVal = Object.values(errorData).flat().find(Boolean);
         if (typeof firstVal === 'string') message = firstVal;
       }
-      throw new Error(message || `Request failed with status ${response.status}`);
+      const apiErr: any = new Error(message || `Request failed with status ${response.status}`);
+      if (errorData?.code) apiErr.code = errorData.code;
+      if (errorData?.email) apiErr.email = errorData.email;
+      apiErr.status = response.status;
+      throw apiErr;
     }
 
     return await response.json();

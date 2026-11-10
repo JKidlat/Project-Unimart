@@ -1,15 +1,36 @@
+from django.db import transaction
+from django.db.models import Q
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
-from django.db import transaction
 from .models import Profile, KYCSubmission
 from universities.models import University
 
 User = get_user_model()
 
+
+def _resolve_university(university_id=None, university_name=''):
+    """Look up an existing University by ID or name/short_name without failing if formatted with '(CODE)'."""
+    if university_id:
+        uni = University.objects.filter(id=university_id).first()
+        if uni:
+            return uni
+    clean = (university_name or '').strip()
+    if not clean:
+        return None
+    uni = University.objects.filter(Q(name__iexact=clean) | Q(short_name__iexact=clean)).first()
+    if uni:
+        return uni
+    base_name = clean.split('(', 1)[0].strip()
+    if base_name:
+        return University.objects.filter(Q(name__iexact=base_name) | Q(short_name__iexact=base_name)).first()
+    return None
+
+
 class UserProfileSerializer(serializers.ModelSerializer):
     university_name = serializers.CharField(source='profile.university.name', read_only=True, default='')
     university_id = serializers.IntegerField(source='profile.university.id', read_only=True, default=None)
     is_vendor = serializers.BooleanField(source='profile.is_vendor', read_only=True, default=False)
+    business_name = serializers.CharField(source='profile.business_name', read_only=True, default='')
     profile_pic = serializers.CharField(source='profile.profile_pic', read_only=True, default=None)
     referral_code = serializers.CharField(source='profile.referral_code', read_only=True, default='')
     referrals_count = serializers.IntegerField(source='profile.referrals_count', read_only=True, default=0)
@@ -17,15 +38,20 @@ class UserProfileSerializer(serializers.ModelSerializer):
     orders_count = serializers.SerializerMethodField()
     wishlist_count = serializers.SerializerMethodField()
     kyc_status = serializers.SerializerMethodField()
-    
+    has_firebase_linked = serializers.SerializerMethodField()
+
     class Meta:
         model = User
         fields = [
-            'id', 'email', 'full_name', 'phone_number', 'is_active', 'is_staff', 
-            'is_email_verified', 'is_verified_student', 'university_id', 'university_name', 'is_vendor', 
-            'role', 'profile_pic', 'referral_code', 'referrals_count', 'orders_count',
-            'wishlist_count', 'kyc_status'
+            'id', 'email', 'full_name', 'phone_number', 'is_active', 'is_staff',
+            'is_email_verified', 'is_verified_student', 'university_id', 'university_name',
+            'is_vendor', 'business_name', 'role', 'profile_pic', 'referral_code',
+            'referrals_count', 'orders_count', 'wishlist_count', 'kyc_status',
+            'has_firebase_linked',
         ]
+
+    def get_has_firebase_linked(self, obj):
+        return bool(getattr(obj, 'firebase_uid', None))
 
     def get_role(self, obj):
         if obj.is_staff or obj.is_superuser:
@@ -60,6 +86,8 @@ class ProfileUpdateSerializer(serializers.Serializer):
     full_name = serializers.CharField(required=False, allow_blank=True)
     phone_number = serializers.CharField(required=False, allow_blank=True)
     university_id = serializers.IntegerField(required=False, allow_null=True)
+    university = serializers.CharField(required=False, allow_blank=True)
+    business_name = serializers.CharField(required=False, allow_blank=True)
     is_vendor = serializers.BooleanField(required=False)
     role = serializers.CharField(required=False)
     profile_pic = serializers.CharField(required=False, allow_blank=True, allow_null=True)
@@ -76,10 +104,35 @@ class ProfileUpdateSerializer(serializers.Serializer):
         if 'university_id' in validated_data:
             uni_id = validated_data['university_id']
             profile.university = University.objects.filter(id=uni_id).first() if uni_id else None
+        elif 'university' in validated_data and validated_data['university']:
+            resolved = _resolve_university(university_name=validated_data['university'])
+            if resolved:
+                profile.university = resolved
+
+        # Prevent unauthorized Buyer -> Seller role elevation via profile updates.
+        # Only existing sellers, KYC-approved users, or staff may hold vendor status.
+        requested_vendor = None
         if 'is_vendor' in validated_data:
-            profile.is_vendor = validated_data['is_vendor']
+            requested_vendor = bool(validated_data['is_vendor'])
         elif 'role' in validated_data:
-            profile.is_vendor = validated_data['role'].lower() == 'seller'
+            role_lower = str(validated_data['role']).strip().lower()
+            if role_lower == 'seller':
+                requested_vendor = True
+            elif role_lower == 'buyer':
+                requested_vendor = False
+
+        if requested_vendor is not None:
+            if not requested_vendor:
+                profile.is_vendor = False
+            elif user.is_staff or user.is_superuser or profile.is_vendor or user.kyc_submissions.filter(status='approved').exists():
+                profile.is_vendor = True
+            else:
+                raise serializers.ValidationError(
+                    {'role': 'Seller privileges require Seller registration or approved KYC verification.'}
+                )
+
+        if 'business_name' in validated_data and (profile.is_vendor or user.is_staff):
+            profile.business_name = validated_data['business_name'].strip()
         if 'profile_pic' in validated_data:
             profile.profile_pic = validated_data['profile_pic']
         profile.save()
@@ -97,8 +150,10 @@ class RegisterSerializer(serializers.Serializer):
     full_name = serializers.CharField(required=False, allow_blank=True, default='')
     phone_number = serializers.CharField(required=False, allow_blank=True, default='')
     university_id = serializers.IntegerField(required=False, allow_null=True, default=None)
+    university = serializers.CharField(required=False, allow_blank=True, default='')
     is_vendor = serializers.BooleanField(required=False, default=False)
     role = serializers.CharField(required=False, default='Buyer')
+    business_name = serializers.CharField(required=False, allow_blank=True, allow_null=True, default='')
     referral_code = serializers.CharField(required=False, allow_blank=True, default='')
 
     def validate_password(self, value):
@@ -119,7 +174,7 @@ class RegisterSerializer(serializers.Serializer):
 
     def validate_email(self, value):
         normalized = value.strip().lower()
-        if User.objects.filter(email=normalized).exists():
+        if User.objects.filter(email__iexact=normalized).exists():
             raise serializers.ValidationError("A user with this email already exists.")
         return normalized
 
@@ -135,7 +190,9 @@ class RegisterSerializer(serializers.Serializer):
         full_name = validated_data.get("full_name", "")
         phone_number = validated_data.get("phone_number", "")
         university_id = validated_data.get("university_id")
-        
+        university_name = validated_data.get("university", "")
+        business_name = (validated_data.get("business_name") or "").strip()
+
         is_vendor = validated_data.get("is_vendor", False)
         role = validated_data.get("role", "Buyer")
         if role.lower() == 'seller':
@@ -149,11 +206,12 @@ class RegisterSerializer(serializers.Serializer):
         user.phone_number = phone_number
         user.save()
 
-        uni_instance = University.objects.filter(id=university_id).first() if university_id else None
+        uni_instance = _resolve_university(university_id=university_id, university_name=university_name)
         Profile.objects.create(
             user=user,
             university=uni_instance,
-            is_vendor=is_vendor
+            is_vendor=is_vendor,
+            business_name=business_name if is_vendor else '',
         )
 
         ref_code = validated_data.get("referral_code", "").strip()

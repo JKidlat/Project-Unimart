@@ -11,21 +11,47 @@ import { Link, useNavigate } from 'react-router';
 import { universities } from '../data/mockData';
 
 export const AccountSettings = () => {
-  const { user, updateProfile, notificationSettings, updateNotificationSettings, logout } = useUser();
+  const { user, updateProfile, linkGoogleAccount, notificationSettings, updateNotificationSettings, logout } = useUser();
   const navigate = useNavigate();
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [linkingGoogle, setLinkingGoogle] = useState(false);
 
   if (!user) return null;
 
-  const handleRoleSwitch = () => {
+  const handleRoleSwitch = async () => {
+    if (user.role === 'Buyer' && user.kyc_status !== 'approved') {
+      toast.info('Complete student seller KYC verification to unlock a Seller account.');
+      navigate('/kyc?mode=buyer_upgrade');
+      return;
+    }
     const newRole = user.role === 'Buyer' ? 'Seller' : 'Buyer';
-    updateProfile({ role: newRole });
-    toast.success(`Switched to ${newRole} mode!`);
+    try {
+      await updateProfile({ role: newRole });
+      toast.success(`Switched to ${newRole} mode!`);
+    } catch (err: any) {
+      toast.error(err.message || 'Unable to change role.');
+    }
   };
 
-  const handleUniversityChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    updateProfile({ university: e.target.value });
-    toast.success(`Default university updated to ${e.target.value}`);
+  const handleUniversityChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
+    try {
+      await updateProfile({ university: e.target.value });
+      toast.success(`Default university updated to ${e.target.value}`);
+    } catch (err: any) {
+      toast.error(err.message || 'Unable to update university.');
+    }
+  };
+
+  const handleLinkGoogle = async () => {
+    setLinkingGoogle(true);
+    try {
+      await linkGoogleAccount();
+      toast.success('Google Sign-In is now linked to your Unimart account!');
+    } catch (err: any) {
+      toast.error(err.message || 'Unable to link Google account.');
+    } finally {
+      setLinkingGoogle(false);
+    }
   };
 
   const handleToggleNotification = (key: keyof typeof notificationSettings) => {
@@ -142,6 +168,31 @@ export const AccountSettings = () => {
                 ))}
               </select>
               <p className="text-[10px] text-gray-400 font-medium italic">This affects the products and deals shown in your feed.</p>
+            </div>
+
+            <div className="flex items-center justify-between pt-4 border-t border-gray-100">
+              <div>
+                <p className="font-bold text-gray-900">Google Sign-In</p>
+                <p className="text-sm text-gray-500">
+                  {user.hasFirebaseLinked
+                    ? 'Your Google account is linked for one-click sign-in.'
+                    : 'Link your Google identity matching your verified Unimart email.'}
+                </p>
+              </div>
+              {user.hasFirebaseLinked ? (
+                <span className="px-3 py-1.5 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-bold">
+                  Linked
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleLinkGoogle}
+                  disabled={linkingGoogle}
+                  className="px-4 py-2 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-700 hover:bg-gray-50 transition-all disabled:opacity-60 cursor-pointer"
+                >
+                  {linkingGoogle ? 'Linking...' : 'Link Google Account'}
+                </button>
+              )}
             </div>
           </div>
         </section>

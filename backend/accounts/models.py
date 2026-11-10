@@ -64,6 +64,13 @@ class User(AbstractBaseUser, PermissionsMixin):
     is_staff = models.BooleanField(default=False)
     is_verified_student = models.BooleanField(default=False)
     is_email_verified = models.BooleanField(default=False)
+    firebase_uid = models.CharField(
+        max_length=128,
+        unique=True,
+        null=True,
+        blank=True,
+        help_text="Verified Firebase UID linked to this existing Unimart account."
+    )
 
     USERNAME_FIELD = 'email'
     REQUIRED_FIELDS = []
@@ -97,6 +104,12 @@ class Profile(models.Model):
     is_vendor = models.BooleanField(
         default=False,
         help_text="Whether the user can sell products in the marketplace."
+    )
+    business_name = models.CharField(
+        max_length=255,
+        blank=True,
+        default='',
+        help_text="Business or store name provided during seller registration."
     )
     profile_pic = models.CharField(
         max_length=500,

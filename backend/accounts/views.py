@@ -14,20 +14,18 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
 from django.contrib.auth.tokens import default_token_generator
 from django.core.exceptions import ValidationError as DjangoValidationError
-from django.db import transaction
 from django.utils import timezone
 from django.utils.encoding import force_str
 from django.utils.http import urlsafe_base64_decode
 
 from core.permissions import IsEmailVerifiedForWrite
-from universities.models import University
-from .authentication import verify_firebase_token
+from .authentication import FirebaseAccountError, resolve_existing_firebase_user, verify_firebase_token
 from .emails import (
     send_password_reset_email,
     send_verification_email,
     verify_email_verification_token,
 )
-from .models import KYCSubmission, Profile
+from .models import KYCSubmission
 from .serializers import RegisterSerializer, UserProfileSerializer, ProfileUpdateSerializer, KYCSubmissionSerializer
 
 
@@ -105,90 +103,62 @@ class RegisterView(generics.CreateAPIView):
         )
 
 
+def _authenticate_with_google(request, password=None):
+    """Shared handler verifying a Firebase ID token strictly against existing Unimart users."""
+    id_token = request.data.get('id_token') or request.data.get('token')
+    if not id_token:
+        return Response({'error': 'Google ID token is required.', 'code': 'MISSING_TOKEN'}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        decoded_token = verify_firebase_token(id_token)
+    except AuthenticationFailed as exc:
+        return Response({'error': str(exc.detail), 'code': 'INVALID_TOKEN'}, status=status.HTTP_401_UNAUTHORIZED)
+
+    try:
+        user, linked_now = resolve_existing_firebase_user(decoded_token, password=password)
+    except FirebaseAccountError as exc:
+        body = {'error': exc.message, 'code': exc.code}
+        if exc.email:
+            body['email'] = exc.email
+        return Response(body, status=exc.status_code)
+
+    return _issue_jwt_response(
+        user,
+        'Google account linked and signed in successfully.' if linked_now else 'Signed in with Google successfully.',
+        linked_now=linked_now,
+    )
+
+
 class GoogleAuthView(generics.GenericAPIView):
     """
-    Exchange a verified Firebase Google ID token for Unimart SimpleJWT tokens.
+    Authenticate an EXISTING Unimart user via a verified Firebase Google ID token.
+    Never creates accounts or bypasses registration; unregistered identities receive HTTP 404.
     """
     authentication_classes = []
     permission_classes = [AllowAny]
     throttle_scope = 'auth'
 
     def post(self, request):
-        id_token = request.data.get('id_token') or request.data.get('token')
-        if not id_token:
-            return Response({'error': 'Google ID token is required.'}, status=status.HTTP_400_BAD_REQUEST)
+        return _authenticate_with_google(request)
 
-        try:
-            decoded_token = verify_firebase_token(id_token)
-        except AuthenticationFailed as exc:
-            return Response({'error': str(exc.detail)}, status=status.HTTP_401_UNAUTHORIZED)
 
-        email = (decoded_token.get('email') or '').strip().lower()
-        email_verified = bool(decoded_token.get('email_verified', False))
-        full_name = (decoded_token.get('name') or '').strip()
-        picture = (decoded_token.get('picture') or '').strip()
+class GoogleAccountLinkView(generics.GenericAPIView):
+    """
+    Explicitly link a verified Google Firebase identity to an existing Unimart password account
+    after confirming the account's current password.
+    """
+    authentication_classes = []
+    permission_classes = [AllowAny]
+    throttle_scope = 'auth'
 
-        if not email or not email_verified:
+    def post(self, request):
+        password = request.data.get('password')
+        if not password:
             return Response(
-                {'error': 'A verified Google email address is required to sign in.'},
+                {'error': 'Your Unimart password is required to link your Google account.', 'code': 'PASSWORD_REQUIRED'},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-
-        university_id = request.data.get('university_id')
-        requested_role = str(request.data.get('role') or 'Buyer').strip().lower()
-        referral_code = str(request.data.get('referral_code') or '').strip()
-
-        with transaction.atomic():
-            user = User.objects.filter(email__iexact=email).first()
-            is_new_user = user is None
-
-            if is_new_user:
-                user = User.objects.create(
-                    email=email,
-                    full_name=full_name,
-                    is_email_verified=True,
-                )
-                user.set_unusable_password()
-                user.save()
-
-                uni_instance = University.objects.filter(id=university_id).first() if university_id else None
-                profile = Profile.objects.create(
-                    user=user,
-                    university=uni_instance,
-                    is_vendor=(requested_role == 'seller'),
-                    profile_pic=picture or None,
-                )
-                if referral_code:
-                    referrer = Profile.objects.filter(referral_code__iexact=referral_code).first()
-                    if referrer and referrer.user != user:
-                        referrer.referrals_count += 1
-                        referrer.save(update_fields=['referrals_count'])
-            else:
-                if not user.is_active:
-                    return Response(
-                        {'error': 'This account has been deactivated.'},
-                        status=status.HTTP_403_FORBIDDEN,
-                    )
-                update_fields = []
-                if not user.is_email_verified:
-                    user.is_email_verified = True
-                    update_fields.append('is_email_verified')
-                if full_name and not user.full_name:
-                    user.full_name = full_name
-                    update_fields.append('full_name')
-                if update_fields:
-                    user.save(update_fields=update_fields)
-
-                profile, _ = Profile.objects.get_or_create(user=user)
-                if picture and not profile.profile_pic:
-                    profile.profile_pic = picture
-                    profile.save(update_fields=['profile_pic'])
-
-        return _issue_jwt_response(
-            user,
-            'Signed in with Google successfully.',
-            is_new_user=is_new_user,
-        )
+        return _authenticate_with_google(request, password=password)
 
 
 class VerifyEmailView(generics.GenericAPIView):

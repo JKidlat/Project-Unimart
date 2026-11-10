@@ -20,25 +20,26 @@
  */
 
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router';
+import { Link, useLocation, useNavigate } from 'react-router';
 import { motion } from 'motion/react';
 import { ShieldCheck, Mail, Lock, User, Phone, GraduationCap, Briefcase, ChevronRight, CheckCircle2 } from 'lucide-react';
 import { universities } from '../../data/mockData';
 import { toast } from 'sonner';
-import { useUser } from '../../context/UserContext';
+import { resolveUserDashboardPath, useUser } from '../../context/UserContext';
 import type { UserRole } from '../../context/UserContext';
 
 export const Signup = () => {
   const navigate = useNavigate();
-  const { signup, loginWithGoogle } = useUser();
+  const location = useLocation();
+  const prefillEmail = (location.state as any)?.prefillEmail || '';
+  const { signup } = useUser();
   const [loading, setLoading] = useState(false);
-  const [googleLoading, setGoogleLoading] = useState(false);
 
   // Form field states
   const [formData, setFormData] = useState({
     fullName: '',
     username: '',
-    email: '',
+    email: prefillEmail,
     university: '',
     password: '',
     confirmPassword: '',
@@ -131,28 +132,11 @@ export const Signup = () => {
       }
 
       toast.success("Account created! Please check your email inbox to verify your address.", { duration: 6000 });
-      navigate('/');
+      navigate(resolveUserDashboardPath(newUser));
     } catch (err: any) {
       toast.error(err.message || "Failed to create account. Please try again.");
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleGoogleSignup = async () => {
-    setGoogleLoading(true);
-    try {
-      const refCode = new URLSearchParams(window.location.search).get('ref') || '';
-      const signedInUser = await loginWithGoogle({
-        role: formData.role,
-        referralCode: refCode,
-      });
-      toast.success(`Welcome to Unimart, ${signedInUser.name}!`);
-      navigate('/');
-    } catch (err: any) {
-      toast.error(err.message || 'Google sign-up failed. Please try again.');
-    } finally {
-      setGoogleLoading(false);
     }
   };
 
@@ -170,24 +154,6 @@ export const Signup = () => {
           </div>
           <h1 className="text-3xl font-black text-gray-900 mb-2">Join Unimart</h1>
           <p className="text-gray-500">The safest marketplace for Ghanaian students</p>
-        </div>
-
-        {/* Social Authentication */}
-        <div className="space-y-4 mb-6">
-          <button
-            type="button"
-            onClick={handleGoogleSignup}
-            disabled={loading || googleLoading}
-            className="w-full flex items-center justify-center gap-3 py-3 border border-gray-200 rounded-xl hover:bg-gray-50 transition-all font-bold text-gray-700 disabled:opacity-60 cursor-pointer"
-          >
-            <img src="https://www.google.com/favicon.ico" alt="Google" className="w-5 h-5" />
-            {googleLoading ? 'Connecting with Google...' : 'Continue with Google'}
-          </button>
-        </div>
-
-        <div className="relative mb-6">
-          <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-gray-100"></div></div>
-          <div className="relative flex justify-center text-xs uppercase"><span className="bg-white px-2 text-gray-400 font-bold">Or sign up with Email</span></div>
         </div>
 
         {/* Registration Form */}
@@ -234,6 +200,7 @@ export const Signup = () => {
                 type="email"
                 name="email"
                 required
+                value={formData.email}
                 placeholder="you@st.ug.edu.gh"
                 className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-[#f3d7db] rounded-xl focus:ring-2 focus:ring-[#a14b58] focus:outline-none"
                 onChange={handleInputChange}

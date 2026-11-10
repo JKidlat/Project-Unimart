@@ -66,6 +66,7 @@ def api_root(request):
                 "register": request.build_absolute_uri('/api/auth/register/'),
                 "login": request.build_absolute_uri('/api/auth/login/'),
                 "google": request.build_absolute_uri('/api/auth/google/'),
+                "google_link": request.build_absolute_uri('/api/auth/google/link/'),
                 "verify_email": request.build_absolute_uri('/api/auth/verify-email/'),
                 "resend_verification": request.build_absolute_uri('/api/auth/resend-verification/'),
                 "password_reset": request.build_absolute_uri('/api/auth/password-reset/'),

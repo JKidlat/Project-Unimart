@@ -5,6 +5,7 @@ import os
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.db import transaction
 import firebase_admin
 from firebase_admin import auth, credentials
 import google.auth.exceptions
@@ -228,9 +229,147 @@ def verify_firebase_token(id_token: str) -> dict:
 ensure_firebase_initialized()
 
 
+class FirebaseAccountError(Exception):
+    """Structured error raised when resolving or linking an existing Unimart account via Firebase."""
+
+    def __init__(self, message: str, code: str, status_code: int, email: str | None = None):
+        super().__init__(message)
+        self.message = message
+        self.code = code
+        self.status_code = status_code
+        self.email = email
+
+
+def resolve_existing_firebase_user(decoded_token: dict, password: str | None = None):
+    """
+    Resolve a verified Firebase identity ONLY against existing Unimart accounts.
+    Never creates new accounts, preserves all stored roles/PKs/passwords, and safely
+    links firebase_uid when verification criteria are satisfied.
+
+    Returns (user, linked_now).
+    """
+    from accounts.models import Profile
+
+    uid = (decoded_token.get("uid") or decoded_token.get("sub") or "").strip()
+    email = (decoded_token.get("email") or "").strip().lower()
+    email_verified = bool(decoded_token.get("email_verified", False))
+    full_name = (decoded_token.get("name") or "").strip()
+    picture = (decoded_token.get("picture") or "").strip()
+
+    if not uid or not email:
+        raise FirebaseAccountError("Firebase token missing identifier claims.", "INVALID_FIREBASE_CLAIMS", 400)
+    if not email_verified:
+        raise FirebaseAccountError(
+            "A verified Google email address is required to sign in.",
+            "UNVERIFIED_GOOGLE_EMAIL",
+            400,
+            email=email,
+        )
+
+    with transaction.atomic():
+        # 1. Lookup by existing linked firebase_uid first
+        uid_matches = list(User.objects.select_related('profile').filter(firebase_uid=uid)[:2])
+        if len(uid_matches) > 1:
+            raise FirebaseAccountError(
+                "Multiple accounts are linked to this Google identity. Please contact support.",
+                "MULTIPLE_ACCOUNTS",
+                409,
+                email=email,
+            )
+
+        if len(uid_matches) == 1:
+            user = uid_matches[0]
+            if not user.is_active:
+                raise FirebaseAccountError(
+                    "This account is inactive or suspended. Please contact support.",
+                    "ACCOUNT_INACTIVE",
+                    403,
+                    email=user.email,
+                )
+            update_fields = []
+            if not user.is_email_verified:
+                user.is_email_verified = True
+                update_fields.append('is_email_verified')
+            if full_name and not user.full_name:
+                user.full_name = full_name
+                update_fields.append('full_name')
+            if update_fields:
+                user.save(update_fields=update_fields)
+
+            profile, _ = Profile.objects.get_or_create(user=user)
+            if picture and not profile.profile_pic:
+                profile.profile_pic = picture
+                profile.save(update_fields=['profile_pic'])
+            return user, False
+
+        # 2. Lookup existing registered Unimart account by verified email (never auto-create)
+        email_matches = list(User.objects.select_related('profile').filter(email__iexact=email)[:2])
+        if len(email_matches) == 0:
+            raise FirebaseAccountError(
+                "You don't have a Unimart account yet. Please create an account to get started.",
+                "ACCOUNT_NOT_FOUND",
+                404,
+                email=email,
+            )
+        if len(email_matches) > 1:
+            raise FirebaseAccountError(
+                "Multiple accounts are associated with this email address. Please contact support.",
+                "MULTIPLE_ACCOUNTS",
+                409,
+                email=email,
+            )
+
+        user = email_matches[0]
+        if user.firebase_uid and user.firebase_uid != uid:
+            raise FirebaseAccountError(
+                "This Unimart account is already linked to a different Google identity.",
+                "FIREBASE_UID_MISMATCH",
+                403,
+                email=user.email,
+            )
+        if not user.is_active:
+            raise FirebaseAccountError(
+                "This account is inactive or suspended. Please contact support.",
+                "ACCOUNT_INACTIVE",
+                403,
+                email=user.email,
+            )
+
+        has_pending_kyc = user.kyc_submissions.filter(status='pending').exists()
+        if password is not None:
+            if not user.has_usable_password() or not user.check_password(password):
+                raise FirebaseAccountError(
+                    "Incorrect Unimart password. Google identity was not linked.",
+                    "INVALID_LINK_PASSWORD",
+                    401,
+                    email=user.email,
+                )
+        elif not user.is_email_verified or has_pending_kyc:
+            raise FirebaseAccountError(
+                "Please verify your email or confirm your Unimart password before linking Google Sign-In.",
+                "ACCOUNT_LINK_VERIFICATION_REQUIRED",
+                409,
+                email=user.email,
+            )
+
+        user.firebase_uid = uid
+        user.is_email_verified = True
+        update_fields = ['firebase_uid', 'is_email_verified']
+        if full_name and not user.full_name:
+            user.full_name = full_name
+            update_fields.append('full_name')
+        user.save(update_fields=update_fields)
+
+        profile, _ = Profile.objects.get_or_create(user=user)
+        if picture and not profile.profile_pic:
+            profile.profile_pic = picture
+            profile.save(update_fields=['profile_pic'])
+        return user, True
+
+
 class FirebaseAuthentication(authentication.BaseAuthentication):
     """
-    Custom authentication class that verifies Firebase ID tokens.
+    Custom authentication class that verifies Firebase ID tokens for existing Unimart users only.
     """
 
     def authenticate(self, request):
@@ -248,25 +387,8 @@ class FirebaseAuthentication(authentication.BaseAuthentication):
             raise exceptions.AuthenticationFailed("Invalid token header. Token string should not contain spaces.")
 
         decoded_token = verify_firebase_token(parts[1])
-        uid = decoded_token.get("uid")
-        email = (decoded_token.get("email") or "").strip().lower()
-        email_verified = bool(decoded_token.get("email_verified", False))
-
-        if not uid or not email:
-            raise exceptions.AuthenticationFailed("Firebase token missing identifier claims.")
-        if not email_verified:
-            raise exceptions.AuthenticationFailed("Firebase account email is not verified.")
-
-        from accounts.models import Profile
-
-        user, created = User.objects.get_or_create(email=email)
-        if created:
-            user.set_unusable_password()
-            user.is_email_verified = True
-            user.save()
-            Profile.objects.get_or_create(user=user)
-        elif not user.is_email_verified:
-            user.is_email_verified = True
-            user.save(update_fields=['is_email_verified'])
-
+        try:
+            user, _ = resolve_existing_firebase_user(decoded_token)
+        except FirebaseAccountError as exc:
+            raise exceptions.AuthenticationFailed(exc.message)
         return (user, None)

@@ -8,16 +8,16 @@ User = get_user_model()
 
 @admin.register(User)
 class UserAdmin(admin.ModelAdmin):
-    list_display = ('email', 'full_name', 'is_active', 'is_staff', 'is_email_verified', 'is_verified_student')
-    search_fields = ('email', 'full_name')
+    list_display = ('email', 'full_name', 'is_active', 'is_staff', 'is_email_verified', 'is_verified_student', 'firebase_uid')
+    search_fields = ('email', 'full_name', 'firebase_uid')
     list_filter = ('is_active', 'is_staff', 'is_email_verified', 'is_verified_student')
     ordering = ('email',)
 
 
 @admin.register(Profile)
 class ProfileAdmin(admin.ModelAdmin):
-    list_display = ('user', 'university', 'is_vendor', 'referral_code', 'referrals_count')
-    search_fields = ('user__email', 'referral_code')
+    list_display = ('user', 'university', 'is_vendor', 'business_name', 'referral_code', 'referrals_count')
+    search_fields = ('user__email', 'business_name', 'referral_code')
     list_filter = ('is_vendor', 'university')
 
 

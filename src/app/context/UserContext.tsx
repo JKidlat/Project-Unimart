@@ -53,6 +53,7 @@ export interface UserProfile {
   referralCode: string;
   is_staff?: boolean;
   is_email_verified?: boolean;
+  hasFirebaseLinked?: boolean;
   kyc_status?: KYCStatus;
   businessName?: string;
 }
@@ -62,8 +63,9 @@ interface UserContextType {
   user: UserProfile | null;
   searchQuery: string;
   setSearchQuery: (query: string) => void;
-  login: (profileOrCredentials: any) => Promise<void>;
-  loginWithGoogle: (options?: { role?: string; universityId?: number | null; referralCode?: string }) => Promise<UserProfile>;
+  login: (profileOrCredentials: any) => Promise<UserProfile>;
+  loginWithGoogle: () => Promise<UserProfile>;
+  linkGoogleAccount: (password?: string, cachedIdToken?: string) => Promise<UserProfile>;
   signup: (formData: any) => Promise<UserProfile>;
   updateProfile: (updates: Partial<UserProfile>) => Promise<void>;
   refreshUserProfile: () => Promise<UserProfile | null>;
@@ -72,6 +74,16 @@ interface UserContextType {
   updateNotificationSettings: (settings: Partial<NotificationSettings>) => void;
   isLoggedIn: boolean;
   isLoading: boolean;
+}
+
+export function resolveUserDashboardPath(user: Partial<UserProfile> | null | undefined, returnTo?: string): string {
+  if (user?.is_staff || user?.role === 'Admin') {
+    return '/admin';
+  }
+  if (user?.role === 'Seller') {
+    return returnTo || '/seller';
+  }
+  return returnTo || '/';
 }
 
 function formatUserProfile(rawUser: any, fallback: Partial<UserProfile> = {}): UserProfile {
@@ -88,6 +100,7 @@ function formatUserProfile(rawUser: any, fallback: Partial<UserProfile> = {}): U
     referralCode: rawUser?.referral_code || fallback.referralCode || `UNIM-${email.slice(0, 2).toUpperCase()}-2026`,
     is_staff: rawUser?.is_staff ?? fallback.is_staff ?? false,
     is_email_verified: rawUser?.is_email_verified ?? fallback.is_email_verified ?? false,
+    hasFirebaseLinked: rawUser?.has_firebase_linked ?? fallback.hasFirebaseLinked ?? false,
     kyc_status: rawUser?.kyc_status || fallback.kyc_status || 'none',
     businessName: rawUser?.business_name || fallback.businessName || undefined,
   };
@@ -176,7 +189,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // ----------------------------------------------------------------------------
   // Action: Log In
   // ----------------------------------------------------------------------------
-  const login = async (data: any) => {
+  const login = async (data: any): Promise<UserProfile> => {
     try {
       // Direct session injection (used for Mock demo or Admin accounts)
       if (data.name && data.email && !data.password) {
@@ -185,7 +198,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setIsLoading(false);
         tokenStorage.setUser(data);
         tokenStorage.setTokens('unimart_auth_' + Date.now());
-        return;
+        return data;
       }
 
       // Standard API password authentication
@@ -194,28 +207,37 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
         password: data.password || 'password123'
       });
 
-      persistAuthResponse(res, { email: data.email, joinDate: 'Oct 2024' });
+      return persistAuthResponse(res, { email: data.email, joinDate: 'Oct 2024' });
     } catch (err: any) {
       throw err;
     }
   };
 
   // ----------------------------------------------------------------------------
-  // Action: Sign In with Google (Firebase ID Token -> Django SimpleJWT)
+  // Action: Sign In with Google (Existing Registered Accounts Only)
   // ----------------------------------------------------------------------------
-  const loginWithGoogle = async (options?: {
-    role?: string;
-    universityId?: number | null;
-    referralCode?: string;
-  }): Promise<UserProfile> => {
+  const loginWithGoogle = async (): Promise<UserProfile> => {
     const idToken = await signInWithGooglePopup();
-    const res = await api.post('/auth/google/', {
-      id_token: idToken,
-      role: options?.role || 'Buyer',
-      university_id: options?.universityId ?? null,
-      referral_code: options?.referralCode || '',
-    });
-    return persistAuthResponse(res, { is_email_verified: true });
+    try {
+      const res = await api.post('/auth/google/', { id_token: idToken });
+      return persistAuthResponse(res, { is_email_verified: true, hasFirebaseLinked: true });
+    } catch (err: any) {
+      if (err?.code === 'ACCOUNT_LINK_VERIFICATION_REQUIRED') {
+        err.pendingIdToken = idToken;
+      }
+      throw err;
+    }
+  };
+
+  // ----------------------------------------------------------------------------
+  // Action: Explicitly Link Google Identity to Existing Account via Password
+  // ----------------------------------------------------------------------------
+  const linkGoogleAccount = async (password?: string, cachedIdToken?: string): Promise<UserProfile> => {
+    const idToken = cachedIdToken || (await signInWithGooglePopup());
+    const endpoint = password ? '/auth/google/link/' : '/auth/google/';
+    const body = password ? { id_token: idToken, password } : { id_token: idToken };
+    const res = await api.post(endpoint, body);
+    return persistAuthResponse(res, { is_email_verified: true, hasFirebaseLinked: true });
   };
 
   // ----------------------------------------------------------------------------
@@ -232,7 +254,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
         university: formData.university,
         role: formData.role || 'Buyer',
         is_vendor: formData.role === 'Seller',
-        business_name: formData.businessName || null,
+        business_name: formData.businessName || '',
         referral_code: formData.referral_code || formData.referralCode || '',
       });
 
@@ -276,22 +298,18 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Action: Update Profile Details
   // ----------------------------------------------------------------------------
   const updateProfile = async (updates: Partial<UserProfile>) => {
-    try {
-      await api.patch('/auth/me/', updates);
-      setUser(prev => {
-        if (!prev) return null;
-        const updated = { ...prev, ...updates };
-        tokenStorage.setUser(updated);
-        return updated;
-      });
-    } catch (err) {
-      // Fallback local update if network is unavailable
-      setUser(prev => {
-        if (!prev) return null;
-        const updated = { ...prev, ...updates };
-        tokenStorage.setUser(updated);
-        return updated;
-      });
+    const payload: Record<string, any> = {};
+    if (updates.name !== undefined) payload.full_name = updates.name;
+    if (updates.university !== undefined) payload.university = updates.university;
+    if (updates.profilePic !== undefined) payload.profile_pic = updates.profilePic;
+    if (updates.businessName !== undefined) payload.business_name = updates.businessName;
+    if (updates.role !== undefined) payload.role = updates.role;
+
+    const fresh = await api.patch('/auth/me/', payload);
+    if (fresh && fresh.email) {
+      const formatted = formatUserProfile(fresh, user || {});
+      setUser(formatted);
+      tokenStorage.setUser(formatted);
     }
   };
 
@@ -322,6 +340,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setSearchQuery,
       login,
       loginWithGoogle,
+      linkGoogleAccount,
       signup,
       updateProfile,
       refreshUserProfile,

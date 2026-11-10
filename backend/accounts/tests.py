@@ -157,42 +157,169 @@ class AuthFlowsTests(TestCase):
         self.assertEqual(login_res.status_code, status.HTTP_200_OK)
 
     @patch("accounts.views.verify_firebase_token")
-    def test_google_auth_token_exchange_and_privilege_safety(self, mock_verify):
-        # Reject unverified Google email
+    def test_unregistered_google_rejected_and_existing_buyer_vendor_linking(self, mock_verify):
+        initial_count = User.objects.count()
+
+        # 1. Reject unverified Google email
         mock_verify.return_value = {"email": "spoof@gmail.com", "email_verified": False, "uid": "u1"}
         bad_res = self.client.post("/api/auth/google/", {"id_token": "fake"}, format="json")
         self.assertEqual(bad_res.status_code, status.HTTP_400_BAD_REQUEST)
 
-        # Reject invalid token
+        # 2. Reject invalid token
         mock_verify.side_effect = AuthenticationFailed("Invalid token")
         err_res = self.client.post("/api/auth/google/", {"id_token": "expired"}, format="json")
         self.assertEqual(err_res.status_code, status.HTTP_401_UNAUTHORIZED)
 
-        # Valid Google login creates verified user and prevents Admin escalation
+        # 3. Unregistered user clicking Google Sign-In MUST NOT auto-create User or Profile
         mock_verify.side_effect = None
         mock_verify.return_value = {
-            "uid": "google-uid-123",
-            "email": "kofi.google@gmail.com",
+            "uid": "unregistered-uid-1",
+            "email": "brandnew.student@gmail.com",
             "email_verified": True,
-            "name": "Kofi Google",
-            "picture": "https://example.com/avatar.png",
+            "name": "Brand New",
         }
-        res = self.client.post(
-            "/api/auth/google/",
-            {"id_token": "valid-google-token", "role": "Admin", "university_id": self.university.id},
+        new_res = self.client.post("/api/auth/google/", {"id_token": "valid-token", "role": "Seller"}, format="json")
+        self.assertEqual(new_res.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertEqual(new_res.data["code"], "ACCOUNT_NOT_FOUND")
+        self.assertEqual(User.objects.count(), initial_count)
+        self.assertFalse(User.objects.filter(email="brandnew.student@gmail.com").exists())
+
+        # 4. Existing unverified email/password Buyer cannot blindly auto-link; requires password confirmation
+        buyer = User.objects.create_user(email="buyer.link@gmail.com", password="BuyerPassword123!")
+        buyer.is_email_verified = False
+        buyer.save()
+        Profile.objects.create(user=buyer, university=self.university, is_vendor=False)
+
+        mock_verify.return_value = {
+            "uid": "buyer-uid-1",
+            "email": "buyer.link@gmail.com",
+            "email_verified": True,
+            "name": "Buyer Linked",
+        }
+        unverified_res = self.client.post("/api/auth/google/", {"id_token": "valid-token"}, format="json")
+        self.assertEqual(unverified_res.status_code, status.HTTP_409_CONFLICT)
+        self.assertEqual(unverified_res.data["code"], "ACCOUNT_LINK_VERIFICATION_REQUIRED")
+
+        # Wrong password rejects link
+        wrong_pw = self.client.post(
+            "/api/auth/google/link/",
+            {"id_token": "valid-token", "password": "WrongPassword!"},
             format="json",
         )
-        self.assertEqual(res.status_code, status.HTTP_200_OK)
-        self.assertTrue(res.data["is_new_user"])
-        self.assertEqual(res.data["user"]["role"], "Buyer")
-        self.assertFalse(res.data["user"]["is_staff"])
-        self.assertTrue(res.data["user"]["is_email_verified"])
-        self.assertIn("access", res.data["tokens"])
+        self.assertEqual(wrong_pw.status_code, status.HTTP_401_UNAUTHORIZED)
 
-        # Subsequent Google login preserves account and skips re-creation
-        res2 = self.client.post("/api/auth/google/", {"id_token": "valid-google-token"}, format="json")
-        self.assertEqual(res2.status_code, status.HTTP_200_OK)
-        self.assertFalse(res2.data["is_new_user"])
+        # Correct password safely links firebase_uid & logs Buyer in preserving PK & role='Buyer'
+        link_res = self.client.post(
+            "/api/auth/google/link/",
+            {"id_token": "valid-token", "password": "BuyerPassword123!"},
+            format="json",
+        )
+        self.assertEqual(link_res.status_code, status.HTTP_200_OK)
+        self.assertTrue(link_res.data["linked_now"])
+        self.assertEqual(link_res.data["user"]["id"], buyer.id)
+        self.assertEqual(link_res.data["user"]["role"], "Buyer")
+        buyer.refresh_from_db()
+        self.assertEqual(buyer.firebase_uid, "buyer-uid-1")
+
+        # Subsequent Google Sign-In with linked firebase_uid works directly
+        relogin = self.client.post("/api/auth/google/", {"id_token": "valid-token"}, format="json")
+        self.assertEqual(relogin.status_code, status.HTTP_200_OK)
+        self.assertFalse(relogin.data["linked_now"])
+
+    @patch("accounts.emails.urllib.request.urlopen", return_value=FakeHTTPResponse(200))
+    @patch("accounts.views.verify_firebase_token")
+    def test_existing_vendor_linking_uid_mismatch_and_suspended_account_blocked(self, mock_verify, _mock_urlopen):
+        # Register Seller with business_name & university name (preserving signup workflow)
+        reg_res = self.client.post(
+            "/api/auth/register/",
+            {
+                "email": "vendor.kofi@gmail.com",
+                "password": "VendorPassword123!",
+                "full_name": "Kofi Vendor",
+                "phone_number": "0241234567",
+                "university": "University of Ghana (UG)",
+                "role": "Seller",
+                "business_name": "Kofi's Campus Tech",
+            },
+            format="json",
+        )
+        self.assertEqual(reg_res.status_code, status.HTTP_201_CREATED)
+        vendor = User.objects.get(email="vendor.kofi@gmail.com")
+        self.assertEqual(vendor.profile.university, self.university)
+        self.assertEqual(vendor.profile.business_name, "Kofi's Campus Tech")
+        self.assertTrue(vendor.profile.is_vendor)
+
+        # Verify vendor email, then sign in with Google -> links existing Vendor and returns Seller role
+        verify_token = make_email_verification_token(vendor)
+        self.assertEqual(
+            self.client.post("/api/auth/verify-email/", {"token": verify_token}, format="json").status_code,
+            status.HTTP_200_OK,
+        )
+
+        mock_verify.return_value = {
+            "uid": "vendor-uid-abc",
+            "email": "vendor.kofi@gmail.com",
+            "email_verified": True,
+            "name": "Kofi Vendor",
+        }
+        v_res = self.client.post("/api/auth/google/", {"id_token": "vendor-token"}, format="json")
+        self.assertEqual(v_res.status_code, status.HTTP_200_OK)
+        self.assertEqual(v_res.data["user"]["id"], vendor.id)
+        self.assertEqual(v_res.data["user"]["role"], "Seller")
+        self.assertEqual(v_res.data["user"]["business_name"], "Kofi's Campus Tech")
+
+        # Different Firebase UID attempting to bind same email is strictly rejected
+        mock_verify.return_value = {
+            "uid": "attacker-different-uid",
+            "email": "vendor.kofi@gmail.com",
+            "email_verified": True,
+        }
+        mismatch_res = self.client.post("/api/auth/google/", {"id_token": "other-token"}, format="json")
+        self.assertEqual(mismatch_res.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(mismatch_res.data["code"], "FIREBASE_UID_MISMATCH")
+
+        # Suspended / inactive user cannot use Google Sign-In
+        vendor.is_active = False
+        vendor.save(update_fields=["is_active"])
+        mock_verify.return_value = {
+            "uid": "vendor-uid-abc",
+            "email": "vendor.kofi@gmail.com",
+            "email_verified": True,
+        }
+        suspended_res = self.client.post("/api/auth/google/", {"id_token": "vendor-token"}, format="json")
+        self.assertEqual(suspended_res.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(suspended_res.data["code"], "ACCOUNT_INACTIVE")
+
+    def test_role_enforcement_buyer_cannot_promote_self_or_post_product_and_seller_blocked_from_admin(self):
+        buyer = User.objects.create_user(email="only.buyer@ug.edu.gh", password="StrongPassword123!")
+        buyer.is_email_verified = True
+        buyer.save()
+        Profile.objects.create(user=buyer, university=self.university, is_vendor=False)
+
+        vendor = User.objects.create_user(email="real.seller@ug.edu.gh", password="StrongPassword123!")
+        vendor.is_email_verified = True
+        vendor.save()
+        Profile.objects.create(user=vendor, university=self.university, is_vendor=True, business_name="Campus Books")
+
+        # Buyer tries to self-escalate to Seller via PATCH /api/auth/me/ -> rejected 400
+        self.client.force_authenticate(user=buyer)
+        esc_res = self.client.patch("/api/auth/me/", {"role": "Seller", "is_vendor": True}, format="json")
+        self.assertEqual(esc_res.status_code, status.HTTP_400_BAD_REQUEST)
+        buyer.refresh_from_db()
+        self.assertFalse(buyer.profile.is_vendor)
+
+        # Buyer tries vendor endpoint POST /api/products/ -> 403 Forbidden
+        prod_res = self.client.post(
+            "/api/products/",
+            {"title": "Illegal Item", "price": "50.00", "description": "test"},
+            format="json",
+        )
+        self.assertEqual(prod_res.status_code, status.HTTP_403_FORBIDDEN)
+
+        # Vendor tries Admin endpoint GET /api/auth/users/ -> 403 Forbidden
+        self.client.force_authenticate(user=vendor)
+        adm_res = self.client.get("/api/auth/users/")
+        self.assertEqual(adm_res.status_code, status.HTTP_403_FORBIDDEN)
 
 
 @override_settings(FIREBASE_PROJECT_ID="unimart-c4308", SECURE_SSL_REDIRECT=False)
@@ -261,6 +388,8 @@ class RealFirebasePublicCertVerificationTests(TestCase):
 
         # Existing administrator logs in with Google -> preserves PK, role=Admin, is_staff=True
         admin_user = User.objects.create_superuser(email="admin.google@gmail.com", password="AdminPass123!")
+        admin_user.is_email_verified = True
+        admin_user.save(update_fields=["is_email_verified"])
         admin_pk = admin_user.pk
         admin_token = self._sign_firebase_jwt({"email": "admin.google@gmail.com", "sub": "adm-uid-1"})
 
@@ -268,7 +397,6 @@ class RealFirebasePublicCertVerificationTests(TestCase):
         self.client.credentials(HTTP_AUTHORIZATION="Bearer stale-invalid-jwt-token")
         admin_res = self.client.post("/api/auth/google/", {"id_token": admin_token}, format="json")
         self.assertEqual(admin_res.status_code, status.HTTP_200_OK)
-        self.assertFalse(admin_res.data["is_new_user"])
         self.assertEqual(admin_res.data["user"]["id"], admin_pk)
         self.assertEqual(admin_res.data["user"]["role"], "Admin")
         self.assertTrue(admin_res.data["user"]["is_staff"])
@@ -286,14 +414,17 @@ class RealFirebasePublicCertVerificationTests(TestCase):
         refresh_replay = self.client.post("/api/auth/token/refresh/", {"refresh": admin_refresh}, format="json")
         self.assertEqual(refresh_replay.status_code, status.HTTP_401_UNAUTHORIZED)
 
-        # Regular new student signs in with Google -> Buyer role, blocked from admin endpoint
+        # Unregistered Google user is rejected 404 (not auto-created)
         self.client.credentials()
-        student_token = self._sign_firebase_jwt({"email": "new.student@gmail.com", "sub": "stu-uid-2"})
-        stu_res = self.client.post("/api/auth/google/", {"id_token": student_token}, format="json")
-        self.assertEqual(stu_res.status_code, status.HTTP_200_OK)
-        self.assertEqual(stu_res.data["user"]["role"], "Buyer")
-        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {stu_res.data['tokens']['access']}")
-        self.assertEqual(self.client.get("/api/auth/users/").status_code, status.HTTP_403_FORBIDDEN)
+        unreg_token = self._sign_firebase_jwt({"email": "unregistered.google@gmail.com", "sub": "unreg-uid-99"})
+        unreg_res = self.client.post("/api/auth/google/", {"id_token": unreg_token}, format="json")
+        self.assertEqual(unreg_res.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertEqual(unreg_res.data["code"], "ACCOUNT_NOT_FOUND")
+        self.assertFalse(User.objects.filter(email="unregistered.google@gmail.com").exists())
+
+        # Direct Bearer Firebase token for unregistered user also rejected cleanly by FirebaseAuthentication
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {unreg_token}")
+        self.assertEqual(self.client.get("/api/auth/me/").status_code, status.HTTP_401_UNAUTHORIZED)
 
         # Reject Google OAuth access token format (ya29....), expired JWT, wrong audience, wrong issuer
         self.client.credentials()
