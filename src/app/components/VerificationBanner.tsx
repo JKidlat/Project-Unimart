@@ -53,3 +53,4 @@ export const VerificationBanner: React.FC = () => {
     </div>
   );
 };
+

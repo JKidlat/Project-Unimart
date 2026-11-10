@@ -56,6 +56,7 @@ class LoginView(TokenObtainPairView):
     Login endpoint that issues JWT tokens and returns the authenticated user profile.
     Protected by 'auth' rate limiting to mitigate brute-force attempts.
     """
+    authentication_classes = []
     serializer_class = CustomTokenObtainPairSerializer
     throttle_scope = 'auth'
 
@@ -84,6 +85,7 @@ class RegisterView(generics.CreateAPIView):
     Register a new user account and return JWT tokens + profile data.
     Sends an email verification link asynchronously/best-effort without blocking signup.
     """
+    authentication_classes = []
     queryset = User.objects.all()
     serializer_class = RegisterSerializer
     permission_classes = [AllowAny]
@@ -107,6 +109,7 @@ class GoogleAuthView(generics.GenericAPIView):
     """
     Exchange a verified Firebase Google ID token for Unimart SimpleJWT tokens.
     """
+    authentication_classes = []
     permission_classes = [AllowAny]
     throttle_scope = 'auth'
 
@@ -192,6 +195,7 @@ class VerifyEmailView(generics.GenericAPIView):
     """
     Verify a user's email address using a signed verification token.
     """
+    authentication_classes = []
     permission_classes = [AllowAny]
     throttle_scope = 'auth'
 
@@ -241,6 +245,7 @@ class PasswordResetRequestView(generics.GenericAPIView):
     Initiate a password reset by emailing a time-limited single-use reset link.
     Always returns HTTP 200 to prevent account enumeration.
     """
+    authentication_classes = []
     permission_classes = [AllowAny]
     throttle_scope = 'auth'
 
@@ -262,6 +267,7 @@ class PasswordResetConfirmView(generics.GenericAPIView):
     """
     Validate uid + token from password reset email and set a new password.
     """
+    authentication_classes = []
     permission_classes = [AllowAny]
     throttle_scope = 'auth'
 

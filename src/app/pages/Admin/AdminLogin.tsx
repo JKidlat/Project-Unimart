@@ -37,12 +37,13 @@ import {
 
 export const AdminLogin: React.FC = () => {
   const navigate = useNavigate();
-  const { login, logout } = useUser();
+  const { login, loginWithGoogle, logout } = useUser();
   const [formData, setFormData] = useState({
     email: '',
     password: '',
   });
   const [isLoading, setIsLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -128,6 +129,29 @@ export const AdminLogin: React.FC = () => {
     });
     setErrorMessage(null);
     toast.info('Co-Admin credentials populated.');
+  };
+
+  const handleGoogleAdminLogin = async () => {
+    setGoogleLoading(true);
+    setErrorMessage(null);
+    try {
+      const signedInUser = await loginWithGoogle();
+      if (signedInUser?.is_staff || signedInUser?.role === 'Admin') {
+        toast.success(`Welcome back, ${signedInUser.name || 'Admin'}! Access granted.`);
+        navigate('/admin');
+      } else {
+        logout();
+        const msg = 'Access denied. This Google account does not possess administrator credentials.';
+        toast.error(msg);
+        setErrorMessage(msg);
+      }
+    } catch (err: any) {
+      const msg = err.message || 'Google administrator sign-in failed.';
+      toast.error(msg);
+      setErrorMessage(msg);
+    } finally {
+      setGoogleLoading(false);
+    }
   };
 
   return (
@@ -220,8 +244,18 @@ export const AdminLogin: React.FC = () => {
         <div className="mt-6 pt-5 border-t border-white/10 space-y-2.5">
           <button
             type="button"
+            onClick={handleGoogleAdminLogin}
+            disabled={isLoading || googleLoading}
+            className="w-full py-2.5 bg-white text-gray-900 hover:bg-gray-100 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 disabled:opacity-60 cursor-pointer"
+          >
+            <img src="https://www.google.com/favicon.ico" alt="Google" className="w-4 h-4" />
+            {googleLoading ? 'Verifying Google Admin...' : 'Sign in with Google'}
+          </button>
+
+          <button
+            type="button"
             onClick={handleQuickFillMaster}
-            disabled={isLoading}
+            disabled={isLoading || googleLoading}
             className="w-full py-2.5 bg-white/10 hover:bg-white/15 border border-white/20 text-white rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2"
           >
             <Sparkles className="w-3.5 h-3.5 text-amber-300" />

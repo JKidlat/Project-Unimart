@@ -548,11 +548,21 @@ async function handleMockFallback(endpoint: string, options: RequestInit = {}): 
  * 3. Handles automatic token refreshing on HTTP 401 Unauthorized
  * 4. Catches network failures and seamlessly runs mock fallback
  */
+const PUBLIC_AUTH_PATHS = [
+  '/auth/login',
+  '/auth/register',
+  '/auth/google',
+  '/auth/verify-email',
+  '/auth/password-reset',
+  '/auth/token/refresh',
+];
+
 export async function apiRequest<T = any>(
   endpoint: string,
   options: RequestInit = {}
 ): Promise<T> {
   const url = `${BASE_URL}${endpoint.startsWith('/') ? '' : '/'}${endpoint}`;
+  const isPublicAuthRequest = PUBLIC_AUTH_PATHS.some((path) => endpoint.startsWith(path));
   const token = tokenStorage.getAccess();
 
   // Set default JSON Content-Type and merge incoming headers
@@ -561,8 +571,8 @@ export async function apiRequest<T = any>(
     ...(options.headers as Record<string, string>),
   };
 
-  // Add Authorization Bearer header if user is authenticated
-  if (token) {
+  // Add Authorization Bearer header only when authenticated and not hitting public login/signup/reset routes
+  if (token && !isPublicAuthRequest) {
     headers['Authorization'] = `Bearer ${token}`;
   }
 
@@ -573,7 +583,7 @@ export async function apiRequest<T = any>(
     });
 
     // Handle token expiration & automatic refresh
-    if (response.status === 401 && tokenStorage.getRefresh()) {
+    if (response.status === 401 && !isPublicAuthRequest && tokenStorage.getRefresh()) {
       try {
         const refreshRes = await fetch(`${BASE_URL}/auth/token/refresh/`, {
           method: 'POST',

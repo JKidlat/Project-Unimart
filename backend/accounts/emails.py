@@ -172,3 +172,4 @@ def send_password_reset_email(user) -> bool:
         "If you did not request a password reset, please ignore this email.\n"
     )
     return send_transactional_email(user.email, subject, html_body, text_body)
+

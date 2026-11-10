@@ -48,7 +48,8 @@ googleProvider.setCustomParameters({ prompt: "select_account" });
 export async function signInWithGooglePopup(): Promise<string> {
   try {
     const result = await signInWithPopup(auth, googleProvider);
-    return await result.user.getIdToken();
+    // Force a fresh Firebase ID token (not a stale cached token)
+    return await result.user.getIdToken(true);
   } catch (err: any) {
     const code = err?.code || "";
     if (code === "auth/popup-closed-by-user" || code === "auth/cancelled-popup-request") {

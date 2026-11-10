@@ -282,5 +282,5 @@ EMAIL_VERIFICATION_MAX_AGE = int(os.environ.get('EMAIL_VERIFICATION_MAX_AGE', 60
 PASSWORD_RESET_TIMEOUT = int(os.environ.get('PASSWORD_RESET_TIMEOUT', 60 * 60))  # 1 hour
 
 # Firebase Project Configuration
-FIREBASE_PROJECT_ID = os.environ.get('FIREBASE_PROJECT_ID', 'unimart-c4308')
+FIREBASE_PROJECT_ID = os.environ.get('FIREBASE_PROJECT_ID', '').strip() or 'unimart-c4308'
 
