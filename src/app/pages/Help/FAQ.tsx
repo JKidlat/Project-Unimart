@@ -48,7 +48,7 @@ const faqData: FAQItem[] = [
   {
     category: 'Safety',
     question: 'What if I encounter a scammer?',
-    answer: 'Report the user immediately through our "Report Issue" feature. We have fraud detection systems and take all reports seriously. Suspicious accounts are suspended pending investigation.'
+    answer: 'Contact our team immediately through Customer Support (/contact). We investigate all safety and fraud reports promptly and suspend suspicious accounts during review.'
   },
   {
     category: 'Account',

@@ -108,25 +108,10 @@ export const Signin = () => {
     setLoading(true);
     try {
       const signedInUser = await login(formData);
-
-      // Check if account was scheduled for deletion within the 30-day grace period
-      try {
-        const { accountDeletionStorage } = await import('../../../lib/api');
-        const requests = accountDeletionStorage.getAll();
-        const pending = requests.find((r: any) => r.userEmail === formData.email && r.status === 'pending');
-        if (pending) {
-          accountDeletionStorage.updateStatus(pending.id, 'reviewed', 'User logged in within 30-day grace period - deletion cancelled & account restored');
-          toast.success("Welcome back! Your pending account deletion has been cancelled and your account is fully restored.", { duration: 6000 });
-        } else {
-          toast.success("Welcome back to Unimart!");
-        }
-      } catch {
-        toast.success("Welcome back to Unimart!");
-      }
-
+      toast.success('Welcome back to Unimart!');
       navigateAfterLogin(signedInUser);
     } catch (err: any) {
-      toast.error(err.message || "Invalid email or password");
+      toast.error(err.message || 'Invalid email or password');
     } finally {
       setLoading(false);
     }

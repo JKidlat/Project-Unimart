@@ -15,6 +15,7 @@ import {
   Star,
   ShieldCheck,
   ShoppingCart,
+  LifeBuoy,
   Filter,
   RefreshCw,
   Radio,
@@ -30,7 +31,7 @@ import { api } from '../../../lib/api';
 
 interface ActivityItem {
   id: string;
-  type: 'signup' | 'listing' | 'order' | 'payment' | 'kyc' | 'review';
+  type: 'signup' | 'listing' | 'order' | 'payment' | 'kyc' | 'review' | 'support';
   message: string;
   subtext?: string;
   timestamp: string | null;
@@ -51,6 +52,7 @@ const activityIcons = {
   payment: DollarSign,
   kyc: ShieldCheck,
   review: Star,
+  support: LifeBuoy,
 };
 
 const activityColors = {
@@ -60,6 +62,7 @@ const activityColors = {
   payment: 'bg-emerald-500 text-emerald-600',
   kyc: 'bg-rose-500 text-rose-600',
   review: 'bg-amber-500 text-amber-600',
+  support: 'bg-teal-500 text-teal-600',
 };
 
 const activityLabels: Record<string, string> = {
@@ -69,6 +72,7 @@ const activityLabels: Record<string, string> = {
   payment: 'Payments',
   kyc: 'KYC Requests',
   review: 'Reviews',
+  support: 'Support',
 };
 
 export const LiveActivity: React.FC = () => {
@@ -149,8 +153,8 @@ export const LiveActivity: React.FC = () => {
           <AdminErrorState message={error} onRetry={loadActivity} />
         ) : (
           <>
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-              {(['signup', 'listing', 'order', 'payment', 'kyc', 'review'] as const).map((type) => {
+            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
+              {(['signup', 'listing', 'order', 'payment', 'kyc', 'review', 'support'] as const).map((type) => {
                 const Icon = activityIcons[type];
                 const colorClass = activityColors[type];
                 const dbTotal = counts[type] ?? activities.filter((a) => a.type === type).length;
@@ -191,6 +195,7 @@ export const LiveActivity: React.FC = () => {
                     { id: 'payment', label: 'Payments' },
                     { id: 'kyc', label: 'KYC' },
                     { id: 'review', label: 'Reviews' },
+                    { id: 'support', label: 'Support' },
                   ].map((tab) => (
                     <button
                       key={tab.id}

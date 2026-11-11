@@ -22,6 +22,7 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from accounts import views as accounts_views
+from core.media import MediaServeView, MediaUploadView
 
 
 
@@ -99,6 +100,10 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/admin/', include('core.admin_urls')),
     path('api/auth/', include('accounts.urls')),
+    path('api/media/upload/', MediaUploadView.as_view(), name='media-upload'),
+    path('api/media/<uuid:pk>/', MediaServeView.as_view(), name='media-serve'),
+    path('api/support/', include('core.support_urls')),
+    path('api/messages/', include('messaging.urls')),
     path("api/", include("marketplace.urls")),
     path("api/orders/", include("orders.urls")),
     path("api/payments/", include("payments.urls")),

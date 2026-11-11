@@ -70,6 +70,7 @@ interface DashboardStats {
   flagged_reviews: number;
   total_universities: number;
   active_universities: number;
+  open_support_tickets?: number;
 }
 
 interface DashboardResponse {
@@ -522,7 +523,20 @@ export const AdminDashboard: React.FC = () => {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+                <Link
+                  to="/admin/support"
+                  className="p-4 rounded-2xl bg-[#faf8f8] hover:bg-[#fcf6f7] border border-gray-100 hover:border-[#f3d7db] transition-all flex flex-col justify-between group"
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-bold text-gray-900 group-hover:text-[#a14b58]">Customer Support</span>
+                    <span className="w-2 h-2 rounded-full bg-blue-500" />
+                  </div>
+                  <p className="text-[11px] text-gray-500">
+                    {stats.open_support_tickets ?? 0} open / in progress tickets
+                  </p>
+                </Link>
+
                 <Link
                   to="/admin/reviews"
                   className="p-4 rounded-2xl bg-[#faf8f8] hover:bg-[#fcf6f7] border border-gray-100 hover:border-[#f3d7db] transition-all flex flex-col justify-between group"

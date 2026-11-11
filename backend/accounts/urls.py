@@ -1,16 +1,12 @@
 """
 URL configuration for accounts app.
-
-Authentication endpoints:
-- POST /login/ - Obtain JWT tokens (access + refresh)
-- POST /token/refresh/ - Refresh access token using refresh token
-- POST /register/ - Register new user account
-- POST /logout/ - Invalidate refresh token
 """
 
 from django.urls import path
 from .views import (
+    AvatarUploadView,
     ChangePasswordView,
+    DeleteAccountView,
     GoogleAccountLinkView,
     GoogleAuthView,
     LoginView,
@@ -40,7 +36,9 @@ urlpatterns = [
     path("password-reset/", PasswordResetRequestView.as_view(), name="password_reset"),
     path("password-reset/confirm/", PasswordResetConfirmView.as_view(), name="password_reset_confirm"),
     path("change-password/", ChangePasswordView.as_view(), name="change_password"),
+    path("delete-account/", DeleteAccountView.as_view(), name="delete_account"),
     path("me/", UserProfileView.as_view(), name="user_profile"),
+    path("me/avatar/", AvatarUploadView.as_view(), name="user_avatar_upload"),
     path("users/", UserListView.as_view(), name="user_list"),
     path("role-requests/", UserRoleChangeRequestView.as_view(), name="role_requests"),
     path("kyc/", KYCSubmissionView.as_view(), name="kyc-list-create"),

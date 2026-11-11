@@ -1,12 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router';
-import { 
-  ShoppingCart, Heart, MessageCircle, Share2, 
-  ShieldCheck, Truck, RotateCcw, Star, ChevronRight,
-  MapPin, CheckCircle, AlertCircle, ArrowRight
+import {
+  ShoppingCart, Heart, MessageCircle, ShieldCheck, Star,
+  ChevronRight, MapPin, CheckCircle, ArrowRight, Loader2, RefreshCw
 } from 'lucide-react';
-import { motion, AnimatePresence } from 'motion/react';
-import { products as defaultProducts } from '../data/mockData';
+import { AnimatePresence } from 'motion/react';
+import { toast } from 'sonner';
+
 import { ImageWithFallback } from '../components/common/ImageWithFallback';
 import { ProductCard } from '../components/ProductCard';
 import { ChatWindow } from '../components/Chat/ChatWindow';
@@ -14,166 +14,240 @@ import { ReviewsSection } from '../components/Reviews/ReviewsSection';
 import { useCart } from '../context/CartContext';
 import { useWishlist } from '../context/WishlistContext';
 import { useUser } from '../context/UserContext';
-import { toast } from 'sonner';
 import { api } from '../../lib/api';
 import { trackProductView } from '../utils/personalization';
-
-// Mock reviews data
-const mockReviews = [
-  {
-    id: '1',
-    reviewerName: 'Kwame Mensah',
-    reviewerUniversity: 'UG - Legon',
-    rating: 5,
-    reviewText: 'Excellent condition! Item works perfectly and the seller was very professional. Met on campus and everything went smoothly.',
-    datePosted: '2 days ago',
-    verified: true,
-    helpfulCount: 12
-  },
-  {
-    id: '2',
-    reviewerName: 'Abena Osei',
-    reviewerUniversity: 'KNUST',
-    rating: 4,
-    reviewText: 'Good quality item. Great price for students on a budget. Met at the student hall.',
-    datePosted: '1 week ago',
-    verified: true,
-    helpfulCount: 5
-  },
-  {
-    id: '3',
-    reviewerName: 'Emmanuel Boateng',
-    reviewerUniversity: 'UCC',
-    rating: 5,
-    reviewText: 'Fast delivery and great communication. The item was exactly as described. Highly recommend this student seller!',
-    datePosted: '2 weeks ago',
-    verified: false,
-    helpfulCount: 8
-  }
-];
+import { formatStockStatus } from '../../lib/inventory';
 
 export const ProductDetails = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { addToCart } = useCart();
   const { addToWishlist, removeFromWishlist, isInWishlist } = useWishlist();
-  const { isLoggedIn } = useUser();
+  const { isLoggedIn, user } = useUser();
 
-  const [product, setProduct] = useState<any>(() => {
-    try {
-      const stored = JSON.parse(localStorage.getItem('unimart_products_store') || '[]');
-      const found = stored.find((p: any) => String(p.id) === String(id));
-      if (found) return found;
-    } catch {}
-    return defaultProducts.find(p => String(p.id) === String(id)) || defaultProducts[0];
-  });
-
-  const [selectedImage, setSelectedImage] = useState<string>(product.image);
+  const [product, setProduct] = useState<any | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [selectedImage, setSelectedImage] = useState<string>('');
   const [quantity, setQuantity] = useState<number>(1);
   const [isChatOpen, setIsChatOpen] = useState<boolean>(false);
-  const [allProducts, setAllProducts] = useState<any[]>(defaultProducts);
+  const [allProducts, setAllProducts] = useState<any[]>([]);
+  const [reviews, setReviews] = useState<any[]>([]);
 
-  // Load product dynamically and track view for personalization
+  const loadProduct = async () => {
+    if (!id) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await api.get(`/products/${id}/`);
+      setProduct(data);
+      const gallery = Array.isArray(data?.images) && data.images.length > 0 ? data.images : [data?.image].filter(Boolean);
+      setSelectedImage(gallery[0] || data?.image || '');
+      trackProductView(data);
+    } catch (err: any) {
+      setError(err?.message || 'Unable to load product details.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
     let active = true;
+    loadProduct();
 
-    api.get(`/products/${id}/`)
-      .then((data) => {
-        if (active && data && data.name) {
-          setProduct(data);
-          setSelectedImage(data.image);
-          trackProductView(data);
-        }
-      })
-      .catch(() => {
-        try {
-          const stored = JSON.parse(localStorage.getItem('unimart_products_store') || '[]');
-          const found = stored.find((p: any) => String(p.id) === String(id));
-          if (active && found) {
-            setProduct(found);
-            setSelectedImage(found.image);
-            trackProductView(found);
-            return;
-          }
-        } catch {}
-        const fallback = defaultProducts.find(p => String(p.id) === String(id)) || defaultProducts[0];
-        if (active) {
-          setProduct(fallback);
-          setSelectedImage(fallback.image);
-          trackProductView(fallback);
-        }
-      });
-
-    // Also load catalog for related products
-    api.get('/products/')
-      .then(res => {
-        const list = res.results || res;
+    api
+      .get('/products/')
+      .then((res) => {
+        const list = res?.results || res;
         if (active && Array.isArray(list)) setAllProducts(list);
       })
       .catch(() => {});
 
-    return () => { active = false; };
+    api
+      .get(`/reviews/?product=${id}`)
+      .then((res) => {
+        const list = res?.results || res;
+        if (active && Array.isArray(list)) {
+          setReviews(
+            list.map((r: any) => ({
+              id: String(r.id),
+              reviewerName: r.user_name || 'Student Buyer',
+              reviewerUniversity: r.user_university || 'Unimart',
+              rating: Number(r.rating || 5),
+              reviewText: r.comment || '',
+              datePosted: r.created_at ? new Date(r.created_at).toLocaleDateString() : 'Recent',
+              verified: Boolean(r.is_verified_purchase),
+              helpfulCount: 0,
+            }))
+          );
+        }
+      })
+      .catch(() => {});
+
+    return () => {
+      active = false;
+    };
   }, [id]);
 
+  if (loading) {
+    return (
+      <div className="max-w-7xl mx-auto px-4 py-24 text-center">
+        <Loader2 className="w-9 h-9 animate-spin text-[#a14b58] mx-auto mb-3" />
+        <p className="text-sm text-gray-500 font-medium">Loading product details...</p>
+      </div>
+    );
+  }
+
+  if (error || !product) {
+    return (
+      <div className="max-w-3xl mx-auto px-4 py-20 text-center space-y-4">
+        <h2 className="text-2xl font-black text-gray-900">Listing unavailable</h2>
+        <p className="text-sm text-gray-500">{error || 'This product could not be found.'}</p>
+        <div className="flex justify-center gap-3">
+          <button
+            onClick={loadProduct}
+            className="px-5 py-2.5 bg-[#a14b58] text-white rounded-xl text-sm font-bold inline-flex items-center gap-2"
+          >
+            <RefreshCw className="w-4 h-4" /> Retry
+          </button>
+          <Link to="/shop" className="px-5 py-2.5 bg-gray-100 text-gray-700 rounded-xl text-sm font-bold">
+            Back to Shop
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  const title = product.name || product.title;
+  const galleryImages: string[] =
+    Array.isArray(product.images) && product.images.length > 0
+      ? product.images
+      : product.image
+      ? [product.image]
+      : [];
+  const stockInfo = formatStockStatus(product.stock);
+  const maxSelectableQty = Math.max(1, stockInfo.count);
   const inWishlist = isInWishlist(product.id);
 
-  const handleToggleWishlist = () => {
+  const sellerRaw = product.seller_details || product.seller || {};
+  const sellerObj = {
+    id: sellerRaw.id,
+    name: sellerRaw.business_name || sellerRaw.name || 'Verified Student',
+    university: sellerRaw.university || product.university_short_name || product.university_name || 'Unimart',
+    rating: Number(sellerRaw.rating ?? product.average_rating ?? 5.0),
+    verified: Boolean(sellerRaw.verified),
+  };
+
+  const isOwnListing = Boolean(user?.id && sellerObj.id && Number(user.id) === Number(sellerObj.id));
+
+  const handleToggleWishlist = async () => {
     if (!isLoggedIn) {
       toast.error('Please sign in to save items to your wishlist');
       navigate('/signin', { state: { returnTo: `/product/${product.id}` } });
       return;
     }
     if (inWishlist) {
-      removeFromWishlist(product.id);
-      toast.info(`Removed "${product.name}" from your wishlist`);
+      await removeFromWishlist(product.id);
+      toast.info(`Removed "${title}" from your wishlist`);
     } else {
-      addToWishlist({
+      await addToWishlist({
         id: product.id,
-        name: product.name,
-        price: product.price,
-        image: product.image,
-        university: product.university,
+        name: title,
+        price: Number(product.price),
+        image: galleryImages[0] || product.image,
+        university: product.university_name || product.university || '',
         category: product.category,
         condition: product.condition,
+        stock: product.stock,
       });
-      toast.success(`Saved "${product.name}" to your wishlist!`);
+      toast.success(`Saved "${title}" to your wishlist!`);
     }
   };
 
-  const handleAddToCart = () => {
+  const handleAddToCart = async () => {
     if (!isLoggedIn) {
       toast.error('Please sign in to add items to your cart');
       navigate('/signin', { state: { returnTo: `/product/${product.id}` } });
       return;
     }
-    addToCart(product, quantity);
-    toast.success(`${quantity}x ${product.name} added to your cart!`);
-  };
-
-  const handleBuyNow = () => {
-    if (!isLoggedIn) {
-      toast.error('Please sign in to complete your order');
-      navigate('/signin', { state: { returnTo: '/checkout' } });
+    if (stockInfo.isOutOfStock) {
+      toast.error('This item is currently out of stock.');
       return;
     }
-    addToCart(product, quantity);
-    navigate('/checkout');
+    try {
+      await addToCart(
+        {
+          id: String(product.id),
+          name: title,
+          price: Number(product.price),
+          image: galleryImages[0] || product.image,
+          university: product.university_name || product.university || '',
+          category: product.category || 'others',
+          stock: product.stock,
+        },
+        quantity
+      );
+    } catch {
+      // Handled in CartContext
+    }
+  };
+
+  const handleBuyNow = async () => {
+    if (!isLoggedIn) {
+      toast.error('Please sign in to complete your order');
+      navigate('/signin', { state: { returnTo: `/product/${product.id}` } });
+      return;
+    }
+    if (stockInfo.isOutOfStock) {
+      toast.error('This item is currently out of stock.');
+      return;
+    }
+    try {
+      await addToCart(
+        {
+          id: String(product.id),
+          name: title,
+          price: Number(product.price),
+          image: galleryImages[0] || product.image,
+          university: product.university_name || product.university || '',
+          category: product.category || 'others',
+          stock: product.stock,
+        },
+        quantity
+      );
+      navigate('/checkout');
+    } catch {
+      // Handled in CartContext
+    }
+  };
+
+  const handleOpenChat = () => {
+    if (!isLoggedIn) {
+      toast.error('Please sign in to message the seller');
+      navigate('/signin', { state: { returnTo: `/product/${product.id}` } });
+      return;
+    }
+    if (isOwnListing) {
+      toast.info('This is your own listing.');
+      return;
+    }
+    setIsChatOpen(true);
   };
 
   const relatedProducts = allProducts
-    .filter(p => p.category === product.category && String(p.id) !== String(product.id))
+    .filter((p) => p.category === product.category && String(p.id) !== String(product.id))
     .slice(0, 4);
-
-  const sellerObj = product.seller || {
-    name: 'Verified Student',
-    rating: 4.8,
-    verified: true,
-  };
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 relative">
       <AnimatePresence>
-        {isChatOpen && <ChatWindow seller={sellerObj} onClose={() => setIsChatOpen(false)} />}
+        {isChatOpen && (
+          <ChatWindow
+            productId={product.id}
+            seller={{ id: sellerObj.id, name: sellerObj.name, university: sellerObj.university }}
+            onClose={() => setIsChatOpen(false)}
+          />
+        )}
       </AnimatePresence>
 
       {/* Breadcrumbs */}
@@ -182,62 +256,82 @@ export const ProductDetails = () => {
         <ChevronRight className="w-4 h-4" />
         <Link to="/shop" className="hover:text-[#a14b58]">Shop</Link>
         <ChevronRight className="w-4 h-4" />
-        <span className="text-gray-400 capitalize">{product.category}</span>
+        <span className="text-gray-400 capitalize">{product.category_name || product.category}</span>
         <ChevronRight className="w-4 h-4" />
-        <span className="text-gray-900 font-bold truncate max-w-xs">{product.name}</span>
+        <span className="text-gray-900 font-bold truncate max-w-xs">{title}</span>
       </nav>
 
       <div className="grid lg:grid-cols-2 gap-12 mb-20">
-        {/* Product Images */}
+        {/* Product Gallery */}
         <div className="space-y-4">
           <div className="aspect-square rounded-[2.5rem] overflow-hidden bg-gray-50 border border-gray-100 shadow-inner">
-            <ImageWithFallback
-              src={selectedImage}
-              alt={product.name}
-              className="w-full h-full object-cover"
-            />
+            <ImageWithFallback src={selectedImage || galleryImages[0]} alt={title} className="w-full h-full object-cover" />
           </div>
-          <div className="grid grid-cols-4 gap-4">
-            {[product.image, product.image, product.image, product.image].map((img, idx) => (
-              <button
-                key={idx}
-                onClick={() => setSelectedImage(img)}
-                className={`aspect-square rounded-2xl overflow-hidden border-2 transition-all ${
-                  selectedImage === img ? 'border-[#a14b58] shadow-lg' : 'border-transparent hover:border-[#f3d7db]'
-                }`}
-              >
-                <ImageWithFallback src={img} alt="" className="w-full h-full object-cover" />
-              </button>
-            ))}
-          </div>
+          {galleryImages.length > 1 && (
+            <div className="grid grid-cols-4 gap-4">
+              {galleryImages.slice(0, 5).map((img, idx) => (
+                <button
+                  key={idx}
+                  type="button"
+                  onClick={() => setSelectedImage(img)}
+                  className={`aspect-square rounded-2xl overflow-hidden border-2 transition-all ${
+                    selectedImage === img ? 'border-[#a14b58] shadow-lg' : 'border-transparent hover:border-[#f3d7db]'
+                  }`}
+                >
+                  <ImageWithFallback src={img} alt="" className="w-full h-full object-cover" />
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Product Info */}
         <div className="flex flex-col">
           <div className="mb-6">
-            <div className="flex items-center gap-3 mb-4 flex-wrap">
+            <div className="flex items-center gap-2.5 mb-4 flex-wrap">
               <span className="bg-[#fcf6f7] text-[#a14b58] text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider">
                 {product.condition || 'Good'}
               </span>
               <span className="bg-gray-100 text-gray-700 text-xs font-bold px-3 py-1 rounded-full capitalize">
-                {product.category}
+                {product.category_name || product.category}
               </span>
+              {stockInfo.label && (
+                <span
+                  className={`text-xs font-black px-3 py-1 rounded-full border ${
+                    stockInfo.tier === 'empty'
+                      ? 'bg-red-600 text-white border-red-700'
+                      : stockInfo.tier === 'critical'
+                      ? 'bg-red-50 text-red-700 border-red-200'
+                      : 'bg-amber-50 text-amber-800 border-amber-200'
+                  }`}
+                >
+                  {stockInfo.label}
+                </span>
+              )}
               <div className="flex items-center gap-1 text-yellow-500">
                 <Star className="w-4 h-4 fill-current" />
-                <span className="text-sm font-bold text-gray-900">{sellerObj.rating || 5.0}</span>
-                <span className="text-sm text-gray-400 font-normal">(Verified Campus Item)</span>
+                <span className="text-sm font-bold text-gray-900">{sellerObj.rating.toFixed(1)}</span>
               </div>
             </div>
-            <h1 className="text-3xl md:text-4xl font-black text-gray-900 mb-3">{product.name}</h1>
+
+            <h1 className="text-3xl md:text-4xl font-black text-gray-900 mb-3">{title}</h1>
+
             <div className="flex items-center gap-2 mb-6 text-gray-500 text-sm">
               <MapPin className="w-4 h-4 text-[#a14b58]" />
-              <span className="font-semibold text-gray-700">{product.university_name || product.university || 'Campus wide'}</span>
+              <span className="font-semibold text-gray-700">
+                {product.university_name || product.university || 'Campus wide'}
+              </span>
             </div>
+
             <div className="flex items-center gap-4 flex-wrap">
-              <span className="text-4xl font-black text-gray-900">GH₵{Number(product.price).toLocaleString()}</span>
+              <span className="text-4xl font-black text-gray-900">
+                GH₵{Number(product.price).toLocaleString()}
+              </span>
               {product.oldPrice && Number(product.oldPrice) > Number(product.price) && (
                 <>
-                  <span className="text-xl text-gray-400 line-through">GH₵{Number(product.oldPrice).toLocaleString()}</span>
+                  <span className="text-xl text-gray-400 line-through">
+                    GH₵{Number(product.oldPrice).toLocaleString()}
+                  </span>
                   <span className="px-3 py-1 rounded-full text-xs font-bold bg-green-100 text-green-700 border border-green-200">
                     {Math.round(((Number(product.oldPrice) - Number(product.price)) / Number(product.oldPrice)) * 100)}% OFF
                   </span>
@@ -246,31 +340,34 @@ export const ProductDetails = () => {
             </div>
           </div>
 
-          {/* Seller Card */}
-          <div className="bg-gray-50 rounded-[2rem] p-6 mb-8 border border-gray-100 relative overflow-hidden">
-            <div className="absolute top-0 right-0 p-4">
-              <div className="flex items-center gap-1 bg-green-50 text-green-600 text-[10px] font-bold px-2 py-1 rounded-full border border-green-100">
-                <ShieldCheck className="w-3 h-3" />
-                VERIFIED STUDENT SELLER
-              </div>
+          {/* Seller Card (clean inline mobile layout) */}
+          <div className="bg-gray-50 rounded-[2rem] p-5 sm:p-6 mb-8 border border-gray-100">
+            <div className="flex items-center justify-between mb-3 gap-2">
+              <h3 className="font-bold text-xs uppercase tracking-wider text-gray-400">Seller</h3>
+              {sellerObj.verified && (
+                <span className="inline-flex items-center gap-1 bg-green-50 text-green-700 text-[10px] font-bold px-2.5 py-0.5 rounded-full border border-green-100">
+                  <ShieldCheck className="w-3 h-3" />
+                  Verified Student
+                </span>
+              )}
             </div>
-            <h3 className="font-bold text-gray-900 mb-4 text-xs uppercase tracking-wider text-gray-400">Seller Details</h3>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 bg-[#fcf6f7] rounded-2xl flex items-center justify-center text-[#a14b58] font-bold text-lg border border-[#f3d7db]">
-                  {sellerObj.name?.charAt(0) || 'U'}
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3.5 min-w-0">
+                <div className="w-12 h-12 bg-[#fcf6f7] rounded-2xl flex items-center justify-center text-[#a14b58] font-bold text-lg border border-[#f3d7db] shrink-0">
+                  {sellerObj.name.charAt(0).toUpperCase()}
                 </div>
-                <div>
+                <div className="min-w-0">
                   <div className="flex items-center gap-1">
-                    <p className="font-bold text-gray-900">{sellerObj.name}</p>
-                    {sellerObj.verified && <CheckCircle className="w-4 h-4 text-blue-500 fill-current text-white" />}
+                    <p className="font-bold text-gray-900 truncate">{sellerObj.name}</p>
+                    {sellerObj.verified && <CheckCircle className="w-4 h-4 text-blue-500 shrink-0" />}
                   </div>
-                  <p className="text-xs text-gray-500">{product.university}</p>
+                  <p className="text-xs text-gray-500 truncate">{sellerObj.university}</p>
                 </div>
               </div>
-              <button 
-                onClick={() => setIsChatOpen(true)}
-                className="flex items-center gap-2 px-4 py-2 bg-white border border-[#f3d7db] rounded-xl text-sm font-bold text-gray-700 hover:bg-[#fcf6f7] transition-colors"
+              <button
+                type="button"
+                onClick={handleOpenChat}
+                className="flex items-center gap-2 px-4 py-2 bg-white border border-[#f3d7db] rounded-xl text-sm font-bold text-gray-700 hover:bg-[#fcf6f7] transition-colors shrink-0"
               >
                 <MessageCircle className="w-4 h-4 text-[#a14b58]" />
                 Chat
@@ -278,34 +375,47 @@ export const ProductDetails = () => {
             </div>
           </div>
 
-          {/* Quantity, Cart & Buy Now Actions */}
+          {/* Quantity, Cart & Instant Buy */}
           <div className="space-y-4 mb-8">
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3 sm:gap-4">
               <div className="flex items-center border border-gray-200 rounded-2xl overflow-hidden bg-white">
-                <button 
+                <button
+                  type="button"
+                  disabled={stockInfo.isOutOfStock || quantity <= 1}
                   onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                  className="px-4 py-3 hover:bg-gray-50 transition-colors text-gray-600 font-bold"
+                  className="px-4 py-3 hover:bg-gray-50 transition-colors text-gray-600 font-bold disabled:opacity-40"
                 >
                   -
                 </button>
-                <span className="px-5 py-3 font-bold text-gray-900 border-x border-gray-200">{quantity}</span>
-                <button 
-                  onClick={() => setQuantity(quantity + 1)}
-                  className="px-4 py-3 hover:bg-gray-50 transition-colors text-gray-600 font-bold"
+                <span className="px-5 py-3 font-bold text-gray-900 border-x border-gray-200">
+                  {stockInfo.isOutOfStock ? 0 : quantity}
+                </span>
+                <button
+                  type="button"
+                  disabled={stockInfo.isOutOfStock || quantity >= maxSelectableQty}
+                  onClick={() => setQuantity(Math.min(maxSelectableQty, quantity + 1))}
+                  className="px-4 py-3 hover:bg-gray-50 transition-colors text-gray-600 font-bold disabled:opacity-40"
                 >
                   +
                 </button>
               </div>
 
-              <button 
+              <button
+                type="button"
+                disabled={stockInfo.isOutOfStock}
                 onClick={handleAddToCart}
-                className="flex-1 bg-[#a14b58] text-white py-4 rounded-2xl font-bold text-base hover:bg-[#863b48] transition-all flex items-center justify-center gap-2 shadow-lg shadow-[#a14b5833]"
+                className={`flex-1 py-4 rounded-2xl font-bold text-base transition-all flex items-center justify-center gap-2 ${
+                  stockInfo.isOutOfStock
+                    ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                    : 'bg-[#a14b58] text-white hover:bg-[#863b48] shadow-lg shadow-[#a14b5833]'
+                }`}
               >
                 <ShoppingCart className="w-5 h-5" />
-                Add to Cart
+                {stockInfo.isOutOfStock ? 'Out of stock' : 'Add to Cart'}
               </button>
 
-              <button 
+              <button
+                type="button"
                 onClick={handleToggleWishlist}
                 className={`p-4 border-2 rounded-2xl transition-all ${
                   inWishlist
@@ -319,17 +429,19 @@ export const ProductDetails = () => {
             </div>
 
             <button
+              type="button"
+              disabled={stockInfo.isOutOfStock}
               onClick={handleBuyNow}
-              className="w-full py-3.5 bg-gray-900 text-white rounded-2xl font-bold text-base hover:bg-black transition-all flex items-center justify-center gap-2 shadow-md"
+              className="w-full py-3.5 bg-gray-900 text-white rounded-2xl font-bold text-base hover:bg-black transition-all flex items-center justify-center gap-2 shadow-md disabled:opacity-40 disabled:cursor-not-allowed"
             >
-              <span>Instant Buy & Checkout</span>
-              <ArrowRight className="w-4 h-4" />
+              <span>{stockInfo.isOutOfStock ? 'Currently Out of Stock' : 'Instant Buy & Checkout'}</span>
+              {!stockInfo.isOutOfStock && <ArrowRight className="w-4 h-4" />}
             </button>
           </div>
 
           <div className="border-t border-gray-100 pt-6">
             <h3 className="font-bold text-gray-900 mb-2">Description</h3>
-            <p className="text-gray-600 leading-relaxed text-sm">
+            <p className="text-gray-600 leading-relaxed text-sm whitespace-pre-wrap">
               {product.description || 'Verified student listing on Unimart. Contact the seller for questions or meetup arrangements.'}
             </p>
           </div>
@@ -338,19 +450,16 @@ export const ProductDetails = () => {
 
       {/* Reviews Section */}
       <div className="mb-20">
-        <ReviewsSection 
-          productName={product.name}
-          reviews={mockReviews}
-          canWriteReview={true}
-        />
+        <ReviewsSection productName={title} reviews={reviews} canWriteReview={isLoggedIn} />
       </div>
 
-      {/* Related Products from same category */}
       {relatedProducts.length > 0 && (
         <section>
           <div className="flex items-center justify-between mb-6">
             <div>
-              <h2 className="text-2xl font-black text-gray-900">More in {product.category}</h2>
+              <h2 className="text-2xl font-black text-gray-900">
+                More in {product.category_name || product.category}
+              </h2>
               <p className="text-sm text-gray-500">Other student listings from this category</p>
             </div>
             <Link to="/shop" className="text-[#a14b58] font-bold text-sm hover:underline">
@@ -358,7 +467,7 @@ export const ProductDetails = () => {
             </Link>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {relatedProducts.map(p => (
+            {relatedProducts.map((p) => (
               <ProductCard key={p.id} product={p} />
             ))}
           </div>

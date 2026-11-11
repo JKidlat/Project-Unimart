@@ -28,6 +28,7 @@ import {
   PackagePlus,
   UserCog,
   GraduationCap,
+  LifeBuoy,
 } from 'lucide-react';
 import { AnimatePresence } from 'motion/react';
 import { useUser } from '../../context/UserContext';
@@ -41,6 +42,7 @@ const navItems = [
   { icon: PackagePlus, label: 'Ad Approvals', path: '/admin/ad-approvals', badgeKey: 'ads' },
   { icon: UserCheck, label: 'KYC Requests', path: '/admin/kyc', badgeKey: 'kyc' },
   { icon: UserCog, label: 'Role Changes', path: '/admin/role-requests', badgeKey: 'role_requests' },
+  { icon: LifeBuoy, label: 'Support', path: '/admin/support', badgeKey: 'support' },
   { icon: CreditCard, label: 'Orders & Payments', path: '/admin/orders' },
   { icon: Star, label: 'Reviews', path: '/admin/reviews' },
   { icon: GraduationCap, label: 'Universities', path: '/admin/universities' },
@@ -63,6 +65,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
     kyc: 0,
     ads: 0,
     role_requests: 0,
+    support: 0,
   });
 
   const refreshCounts = useCallback(async () => {
@@ -73,6 +76,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
           kyc: Number(res.badges.kyc || 0),
           ads: Number(res.badges.ads || 0),
           role_requests: Number(res.badges.role_requests || 0),
+          support: Number(res.badges.support || 0),
         });
       }
     } catch {

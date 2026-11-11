@@ -1,23 +1,85 @@
-import React, { useState } from 'react';
-import { 
-  User, Bell, Shield, Trash2, LogOut, 
+import React, { useEffect, useState } from 'react';
+import {
+  User, Bell, Shield, Trash2, LogOut,
   ChevronRight, Camera, GraduationCap, ArrowLeft,
-  ToggleLeft, ToggleRight, AlertTriangle
+  ToggleLeft, ToggleRight, AlertTriangle, Loader2, Check
 } from 'lucide-react';
 import { motion } from 'motion/react';
-import { useUser } from '../context/UserContext';
 import { toast } from 'sonner';
 import { Link, useNavigate } from 'react-router';
+
+import { useUser } from '../context/UserContext';
 import { UniversitySelector } from '../components/common/UniversitySelector';
 import type { UniversityOption } from '../../hooks/useUniversities';
+import { api } from '../../lib/api';
 
 export const AccountSettings = () => {
-  const { user, updateProfile, linkGoogleAccount, notificationSettings, updateNotificationSettings, logout } = useUser();
+  const {
+    user,
+    updateProfile,
+    uploadAvatar,
+    linkGoogleAccount,
+    notificationSettings,
+    updateNotificationSettings,
+    logout,
+  } = useUser();
   const navigate = useNavigate();
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
+
+  const [fullName, setFullName] = useState(user?.name || '');
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [avatarError, setAvatarError] = useState<string | null>(null);
   const [linkingGoogle, setLinkingGoogle] = useState(false);
 
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteReason, setDeleteReason] = useState('');
+  const [deleteConfirmSecret, setDeleteConfirmSecret] = useState('');
+  const [deletingAccount, setDeletingAccount] = useState(false);
+
+  useEffect(() => {
+    if (user?.name) {
+      setFullName(user.name);
+    }
+  }, [user?.name]);
+
   if (!user) return null;
+
+  const handleSaveName = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const cleaned = fullName.trim();
+    if (!cleaned) {
+      toast.error('Full name cannot be empty.');
+      return;
+    }
+    setSavingProfile(true);
+    try {
+      await updateProfile({ name: cleaned });
+      toast.success('Profile details saved.');
+    } catch (err: any) {
+      toast.error(err?.message || 'Unable to save profile details.');
+    } finally {
+      setSavingProfile(false);
+    }
+  };
+
+  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+
+    setAvatarError(null);
+    setUploadingAvatar(true);
+    try {
+      await uploadAvatar(file);
+      toast.success('Profile picture saved!');
+    } catch (err: any) {
+      const msg = err?.message || 'Failed to upload profile picture. Please use a valid JPG, PNG, WebP, or GIF image under 5 MB.';
+      setAvatarError(msg);
+      toast.error(msg);
+    } finally {
+      setUploadingAvatar(false);
+    }
+  };
 
   const handleRoleSwitch = async () => {
     if (user.role === 'Buyer' && user.kyc_status !== 'approved') {
@@ -60,12 +122,29 @@ export const AccountSettings = () => {
     updateNotificationSettings({ [key]: !notificationSettings[key] });
   };
 
-  const handleDeleteAccount = () => {
-    toast.info("Account scheduled for deletion with a 30-day grace period. You will be logged out now. Logging in within 30 days will reactivate your account.", { duration: 5000 });
-    setTimeout(() => {
+  const handleDeleteAccount = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!deleteConfirmSecret.trim()) {
+      toast.error('Please enter your password (or account email if you signed up with Google) to confirm deletion.');
+      return;
+    }
+
+    setDeletingAccount(true);
+    try {
+      const res = await api.post<{ message: string }>('/auth/delete-account/', {
+        password: deleteConfirmSecret,
+        confirm_email: deleteConfirmSecret.trim(),
+        reason: deleteReason.trim() || 'User requested account deletion',
+      });
+      toast.success(res?.message || 'Your account has been permanently deleted.');
+      setShowDeleteModal(false);
       logout();
-      navigate('/');
-    }, 2500);
+      navigate('/', { replace: true });
+    } catch (err: any) {
+      toast.error(err?.message || 'Unable to authorize account deletion. Please verify your credentials.');
+    } finally {
+      setDeletingAccount(false);
+    }
   };
 
   return (
@@ -84,56 +163,68 @@ export const AccountSettings = () => {
             <User className="w-5 h-5 text-[#a14b58]" />
             Profile Information
           </h2>
-          
-          <div className="flex flex-col sm:flex-row items-center gap-8">
-            <div className="relative group">
-              <div className="w-24 h-24 rounded-3xl bg-[#fcf6f7] flex items-center justify-center text-2xl font-black text-[#a14b58] overflow-hidden border-2 border-[#f3d7db] shadow-inner">
-                {user.profilePic ? (
-                  <img src={user.profilePic} alt="Profile" className="w-full h-full object-cover" />
-                ) : (
-                  user.name.split(' ').map(n => n[0]).join('')
-                )}
+
+          <div className="flex flex-col sm:flex-row items-center sm:items-start gap-8">
+            <div className="flex flex-col items-center gap-2">
+              <div className="relative group">
+                <div className="w-24 h-24 rounded-3xl bg-[#fcf6f7] flex items-center justify-center text-2xl font-black text-[#a14b58] overflow-hidden border-2 border-[#f3d7db] shadow-inner">
+                  {uploadingAvatar ? (
+                    <Loader2 className="w-7 h-7 animate-spin text-[#a14b58]" />
+                  ) : user.profilePic ? (
+                    <img src={user.profilePic} alt="Profile" className="w-full h-full object-cover" />
+                  ) : (
+                    user.name.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase()
+                  )}
+                </div>
+                <label
+                  className={`absolute -bottom-2 -right-2 p-2 bg-white rounded-xl shadow-lg border border-gray-100 text-[#a14b58] transition-all ${
+                    uploadingAvatar ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:scale-110'
+                  }`}
+                >
+                  <Camera className="w-4 h-4" />
+                  <input
+                    type="file"
+                    className="hidden"
+                    disabled={uploadingAvatar}
+                    accept="image/jpeg,image/png,image/webp,image/gif"
+                    onChange={handleAvatarChange}
+                  />
+                </label>
               </div>
-              <label className="absolute -bottom-2 -right-2 p-2 bg-white rounded-xl shadow-lg border border-gray-100 text-[#a14b58] cursor-pointer hover:scale-110 transition-all">
-                <Camera className="w-4 h-4" />
-                <input 
-                  type="file" 
-                  className="hidden" 
-                  accept="image/*"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) {
-                      const reader = new FileReader();
-                      reader.onloadend = () => {
-                        updateProfile({ profilePic: reader.result as string });
-                        toast.success("Profile picture updated!");
-                      };
-                      reader.readAsDataURL(file);
-                    }
-                  }}
-                />
-              </label>
+              <span className="text-[11px] text-gray-400">JPG, PNG, WebP or GIF (max 5 MB)</span>
+              {avatarError && <p className="text-xs text-red-600 text-center max-w-[180px]">{avatarError}</p>}
             </div>
-            
-            <div className="flex-1 w-full space-y-4">
+
+            <form onSubmit={handleSaveName} className="flex-1 w-full space-y-4">
               <div>
                 <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-1">Full Name</label>
-                <input 
-                  type="text" 
-                  defaultValue={user.name}
+                <input
+                  type="text"
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
                   className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-[#a14b58] outline-none font-medium"
                 />
               </div>
               <div>
                 <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-1">Email Address</label>
-                <input 
-                  type="email" 
-                  defaultValue={user.email}
+                <input
+                  type="email"
+                  value={user.email}
                   disabled
                   className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl font-medium text-gray-400 cursor-not-allowed"
                 />
               </div>
-            </div>
+              <div className="flex justify-end">
+                <button
+                  type="submit"
+                  disabled={savingProfile || fullName.trim() === user.name}
+                  className="px-5 py-2.5 bg-[#a14b58] text-white rounded-xl text-xs font-bold hover:bg-[#863b48] transition-all disabled:opacity-50 flex items-center gap-1.5"
+                >
+                  <Check className="w-3.5 h-3.5" />
+                  {savingProfile ? 'Saving...' : 'Save Changes'}
+                </button>
+              </div>
+            </form>
           </div>
         </section>
 
@@ -143,14 +234,16 @@ export const AccountSettings = () => {
             <GraduationCap className="w-5 h-5 text-[#a14b58]" />
             Marketplace Preferences
           </h2>
-          
+
           <div className="space-y-6">
             <div className="flex items-center justify-between">
               <div>
                 <p className="font-bold text-gray-900">Current Role</p>
-                <p className="text-sm text-gray-500">You are currently a <span className="text-[#a14b58] font-bold">{user.role}</span></p>
+                <p className="text-sm text-gray-500">
+                  You are currently a <span className="text-[#a14b58] font-bold">{user.role}</span>
+                </p>
               </div>
-              <button 
+              <button
                 onClick={handleRoleSwitch}
                 className="px-4 py-2 bg-[#fcf6f7] text-[#a14b58] rounded-xl text-sm font-bold border border-[#f3d7db] hover:bg-[#f3d7db] transition-all"
               >
@@ -160,11 +253,10 @@ export const AccountSettings = () => {
 
             <div className="space-y-2">
               <label className="font-bold text-gray-900 block">Default University</label>
-              <UniversitySelector
-                value={user.university}
-                onChange={handleUniversityChange}
-              />
-              <p className="text-[10px] text-gray-400 font-medium italic">This affects the products and deals shown in your feed.</p>
+              <UniversitySelector value={user.university} onChange={handleUniversityChange} />
+              <p className="text-[10px] text-gray-400 font-medium italic">
+                This affects the products and deals shown in your feed.
+              </p>
             </div>
 
             <div className="flex items-center justify-between pt-4 border-t border-gray-100">
@@ -200,16 +292,20 @@ export const AccountSettings = () => {
             <Bell className="w-5 h-5 text-[#a14b58]" />
             Notifications
           </h2>
-          
+
           <div className="space-y-4">
             {Object.entries(notificationSettings).map(([key, value]) => (
               <div key={key} className="flex items-center justify-between py-2">
                 <span className="font-bold text-gray-700 capitalize">{key} Notifications</span>
-                <button 
+                <button
                   onClick={() => handleToggleNotification(key as keyof typeof notificationSettings)}
                   className="text-[#a14b58] hover:scale-110 transition-transform"
                 >
-                  {value ? <ToggleRight className="w-8 h-8 fill-[#a14b58] text-[#f3d7db]" /> : <ToggleLeft className="w-8 h-8 text-gray-300" />}
+                  {value ? (
+                    <ToggleRight className="w-8 h-8 fill-[#a14b58] text-[#f3d7db]" />
+                  ) : (
+                    <ToggleLeft className="w-8 h-8 text-gray-300" />
+                  )}
                 </button>
               </div>
             ))}
@@ -220,11 +316,11 @@ export const AccountSettings = () => {
         <section className="bg-red-50/30 rounded-[2.5rem] p-8 border border-red-100">
           <h2 className="text-xl font-bold mb-6 text-red-600 flex items-center gap-2">
             <Shield className="w-5 h-5" />
-            Security & Danger Zone
+            Security &amp; Danger Zone
           </h2>
-          
+
           <div className="space-y-4">
-            <button 
+            <button
               onClick={() => logout()}
               className="w-full flex items-center justify-between p-4 bg-white rounded-2xl border border-gray-100 hover:border-[#a14b58] group transition-all"
             >
@@ -237,23 +333,24 @@ export const AccountSettings = () => {
               <ChevronRight className="w-5 h-5 text-gray-300" />
             </button>
 
-            {/* Privacy Policy Link */}
-            <div className="p-4 bg-gray-50 rounded-2xl border border-gray-100 flex items-center justify-between text-sm">
+            <div className="p-4 bg-gray-50 rounded-2xl border border-gray-100 flex items-center justify-between gap-3 text-sm">
               <div>
-                <span className="font-bold text-gray-800 block">Privacy & Data Protection</span>
-                <span className="text-xs text-gray-500">Learn how your student information is protected under Ghana Act 843</span>
+                <span className="font-bold text-gray-800 block">Privacy &amp; Data Protection</span>
+                <span className="text-xs text-gray-500">
+                  Protected under Ghana Data Protection Act, 2012 (Act 843)
+                </span>
               </div>
-              <Link
-                to="/legal/privacy"
-                target="_blank"
-                className="text-xs font-bold text-[#a14b58] hover:underline"
-              >
+              <Link to="/legal/privacy" target="_blank" className="text-xs font-bold text-[#a14b58] hover:underline shrink-0">
                 View Policy
               </Link>
             </div>
 
-            <button 
-              onClick={() => setShowDeleteModal(true)}
+            <button
+              onClick={() => {
+                setDeleteConfirmSecret('');
+                setDeleteReason('');
+                setShowDeleteModal(true);
+              }}
               className="w-full flex items-center justify-between p-4 bg-white rounded-2xl border border-gray-100 hover:border-red-500 group transition-all"
             >
               <div className="flex items-center gap-4">
@@ -261,8 +358,10 @@ export const AccountSettings = () => {
                   <Trash2 className="w-5 h-5" />
                 </div>
                 <div className="text-left">
-                  <span className="font-bold text-red-600 block">Request Account Deletion</span>
-                  <span className="text-[10px] text-gray-400">Exercise right to erasure under Data Protection Act (Act 843)</span>
+                  <span className="font-bold text-red-600 block">Delete Account</span>
+                  <span className="text-[10px] text-gray-400">
+                    Permanently delete or anonymize your personal data under Act 843
+                  </span>
                 </div>
               </div>
               <ChevronRight className="w-5 h-5 text-gray-300" />
@@ -271,10 +370,11 @@ export const AccountSettings = () => {
         </section>
       </div>
 
-      {/* Account Deletion Request Modal */}
+      {/* Authorized Account Deletion Modal */}
       {showDeleteModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center px-4 bg-black/60 backdrop-blur-sm">
-          <motion.div 
+          <motion.form
+            onSubmit={handleDeleteAccount}
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
             className="bg-white rounded-[2.5rem] p-8 max-w-lg w-full shadow-2xl"
@@ -282,55 +382,59 @@ export const AccountSettings = () => {
             <div className="w-16 h-16 bg-red-50 rounded-2xl flex items-center justify-center text-red-600 mb-6">
               <AlertTriangle className="w-8 h-8" />
             </div>
-            <h3 className="text-2xl font-black text-gray-900 mb-2">Request Account Deletion</h3>
+            <h3 className="text-2xl font-black text-gray-900 mb-2">Confirm Account Deletion</h3>
             <p className="text-xs sm:text-sm text-gray-600 mb-4 leading-relaxed">
-              Under Ghana&apos;s Data Protection Act, 2012 (Act 843), you have the right to request deletion of your account and erasure of personal data.
+              Under Ghana&apos;s Data Protection Act, 2012 (Act 843), deleting your account immediately revokes active sessions, erases personal profile/KYC/wishlist/cart data, and hides any active store listings.
             </p>
-            <div className="p-4 bg-amber-50 rounded-2xl border border-amber-200/60 text-xs text-amber-900 mb-6 leading-relaxed space-y-1.5">
-              <p><strong>30-Day Grace Period:</strong> Your account will be deactivated and your data safely stored for 30 days before being permanently deleted. If you log in again at any point within the next 30 days, your deletion request will be automatically cancelled and your account fully restored.</p>
-              <p className="text-[11px] text-amber-800">Records associated with unresolved transactions or mandatory legal compliance will be handled in accordance with the Ghana Data Protection Act (Act 843).</p>
+            <div className="p-4 bg-amber-50 rounded-2xl border border-amber-200/60 text-xs text-amber-900 mb-5 leading-relaxed">
+              Where historical order records exist, transaction ledgers are retained in anonymized form for legal and accounting compliance while all identifying personal information is erased.
             </div>
 
-            <div className="mb-6">
-              <label className="text-xs font-bold text-gray-700 block mb-1.5">
-                Reason for closure (optional):
-              </label>
-              <input
-                type="text"
-                id="deletionReasonInput"
-                placeholder="e.g. Graduated from university, not selling anymore..."
-                className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
-              />
+            <div className="space-y-4 mb-6">
+              <div>
+                <label className="text-xs font-bold text-gray-700 block mb-1.5">
+                  Confirm Password (or your account email if registered without a password) *
+                </label>
+                <input
+                  type="password"
+                  required
+                  value={deleteConfirmSecret}
+                  onChange={(e) => setDeleteConfirmSecret(e.target.value)}
+                  placeholder="Enter password to authorize deletion"
+                  className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-gray-700 block mb-1.5">Reason for closure (optional):</label>
+                <input
+                  type="text"
+                  value={deleteReason}
+                  onChange={(e) => setDeleteReason(e.target.value)}
+                  placeholder="e.g. Graduated from university, not selling anymore..."
+                  className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
+                />
+              </div>
             </div>
 
             <div className="flex flex-col sm:flex-row gap-3">
-              <button 
+              <button
+                type="button"
                 onClick={() => setShowDeleteModal(false)}
+                disabled={deletingAccount}
                 className="flex-1 py-3.5 px-6 bg-gray-100 text-gray-700 rounded-xl font-bold hover:bg-gray-200 transition-all text-sm"
               >
                 Cancel
               </button>
-              <button 
-                onClick={async () => {
-                  const inputEl = document.getElementById('deletionReasonInput') as HTMLInputElement;
-                  const reason = inputEl?.value || 'User requested account closure';
-                  
-                  const { accountDeletionStorage } = await import('../../lib/api');
-                  accountDeletionStorage.createRequest({
-                    userId: user.id || user.email,
-                    userEmail: user.email,
-                    userName: user.name,
-                    reason,
-                  });
-
-                  handleDeleteAccount();
-                }}
-                className="flex-1 py-3.5 px-6 bg-red-600 text-white rounded-xl font-bold hover:bg-red-700 transition-all shadow-lg shadow-red-600/20 text-sm"
+              <button
+                type="submit"
+                disabled={deletingAccount}
+                className="flex-1 py-3.5 px-6 bg-red-600 text-white rounded-xl font-bold hover:bg-red-700 transition-all shadow-lg shadow-red-600/20 text-sm disabled:opacity-60"
               >
-                Submit Deletion Request
+                {deletingAccount ? 'Deleting Account...' : 'Delete My Account'}
               </button>
             </div>
-          </motion.div>
+          </motion.form>
         </div>
       )}
     </div>

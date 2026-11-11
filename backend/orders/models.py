@@ -11,6 +11,8 @@ from marketplace.models import Product
 class Order(models.Model):
     STATUS_CHOICES = [
         ("pending", "Pending"),
+        ("processing", "Processing"),
+        ("ready_for_pickup", "Ready for Pickup"),
         ("paid", "Paid"),
         ("shipped", "Shipped"),
         ("completed", "Completed"),
@@ -50,6 +52,15 @@ class Order(models.Model):
         choices=REFUND_STATUS_CHOICES,
         default="none",
         help_text="Refund processing status."
+    )
+    inventory_deducted = models.BooleanField(
+        default=False,
+        help_text="Tracks whether inventory stock was atomically deducted on vendor confirmation."
+    )
+    vendor_confirmed_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="Timestamp when vendor confirmed order completion."
     )
 
     created_at = models.DateTimeField(auto_now_add=True)

@@ -92,10 +92,23 @@ class Product(models.Model):
         help_text="Original price before discount"
     )
     image = models.CharField(
-        max_length=500,
+        max_length=1000,
         blank=True,
         default="https://images.unsplash.com/photo-1650094983020-89c3dfa9ce0d",
         help_text="Primary image URL"
+    )
+    images = models.JSONField(
+        default=list,
+        blank=True,
+        help_text="Ordered list of uploaded image URLs for this listing"
+    )
+    stock = models.PositiveIntegerField(
+        default=1,
+        help_text="Number of available items/units remaining in inventory"
+    )
+    is_resubmitted = models.BooleanField(
+        default=False,
+        help_text="True when a previously approved/rejected listing was edited and resubmitted for moderation"
     )
 
     status = models.CharField(
@@ -161,4 +174,31 @@ class WishlistItem(models.Model):
 
     def __str__(self):
         return f"{self.user.email} -> {self.product.title}"
+
+
+class CartItem(models.Model):
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="cart_items"
+    )
+    product = models.ForeignKey(
+        Product,
+        on_delete=models.CASCADE,
+        related_name="cart_entries"
+    )
+    quantity = models.PositiveIntegerField(default=1)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ('user', 'product')
+        ordering = ['-updated_at']
+        indexes = [
+            models.Index(fields=['user', '-updated_at'], name='cart_user_idx'),
+        ]
+
+    def __str__(self):
+        return f"Cart({self.user.email}: {self.quantity}x {self.product.title})"
+
 

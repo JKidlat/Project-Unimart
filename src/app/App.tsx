@@ -95,13 +95,13 @@ import { AdApprovals } from './pages/Admin/AdApprovals';
 import { KYCManagement } from './pages/Admin/KYCManagement';
 import { RoleChangeApprovals } from './pages/Admin/RoleChangeApprovals';
 import { UniversitiesManagement } from './pages/Admin/UniversitiesManagement';
+import { SupportManagement } from './pages/Admin/SupportManagement';
 
 // ============================================================================
 // Help & Support Pages
 // ============================================================================
 import { Messages } from './pages/Messages';
 import { HelpCenter } from './pages/Help/HelpCenter';
-import { ReportIssue } from './pages/Help/ReportIssue';
 import { FAQ } from './pages/Help/FAQ';
 import { ContactSupport } from './pages/Help/ContactSupport';
 import { SystemStatus } from './pages/Help/SystemStatus';
@@ -244,15 +244,17 @@ const AppContent = () => {
           <Route path="/admin/reviews" element={<ProtectedRoute allowedRoles={['Admin']}><ReviewsModeration /></ProtectedRoute>} />
           <Route path="/admin/orders" element={<ProtectedRoute allowedRoles={['Admin']}><OrdersManagement /></ProtectedRoute>} />
           <Route path="/admin/universities" element={<ProtectedRoute allowedRoles={['Admin']}><UniversitiesManagement /></ProtectedRoute>} />
+          <Route path="/admin/support" element={<ProtectedRoute allowedRoles={['Admin']}><SupportManagement /></ProtectedRoute>} />
           
           {/* ============================================================== */}
           {/* 6. USER MESSAGES & SUPPORT CENTER                             */}
           {/* ============================================================== */}
           <Route path="/messages" element={<ProtectedRoute><Messages /></ProtectedRoute>} />
           <Route path="/help-center" element={<HelpCenter />} />
-          <Route path="/help/report" element={<ReportIssue />} />
+          <Route path="/help/report" element={<Navigate to="/contact" replace />} />
           <Route path="/help/faq" element={<FAQ />} />
           <Route path="/help/contact" element={<ContactSupport />} />
+          <Route path="/support" element={<ContactSupport />} />
           <Route path="/help/status" element={<SystemStatus />} />
           
           {/* ============================================================== */}

@@ -24,6 +24,8 @@ import {
   AdminErrorState,
   formatAdminDate,
 } from '../../components/Admin/AdminStateFeedback';
+import { ImageWithFallback } from '../../components/common/ImageWithFallback';
+import { formatStockStatus, isLegacyBlobUrl } from '../../../lib/inventory';
 import { api } from '../../../lib/api';
 import { toast } from 'sonner';
 
@@ -33,13 +35,17 @@ interface AdminProductItem {
   title: string;
   category: string;
   price: number;
+  stock?: number;
+  stock_label?: string | null;
   condition: string;
   status: 'pending_approval' | 'live' | 'flagged' | 'hidden' | 'rejected';
   is_available: boolean;
+  is_resubmitted?: boolean;
   flagReason?: string;
   rejectionReason?: string;
   created_at: string | null;
   image: string;
+  images?: string[];
   description: string;
   university: string;
   seller: {
@@ -316,18 +322,31 @@ export const ProductManagement: React.FC = () => {
                         <tr key={product.id} className="hover:bg-gray-50/70 transition-colors">
                           <td className="px-5 py-4">
                             <div className="flex items-center gap-3">
-                              <img
+                              <ImageWithFallback
                                 src={product.image}
                                 alt={product.name}
                                 className="w-12 h-12 rounded-xl object-cover border border-gray-100 shrink-0 bg-gray-50"
                               />
                               <div className="min-w-0">
                                 <p className="font-bold text-gray-900 text-sm truncate max-w-xs">{product.name}</p>
-                                <div className="flex items-center gap-2 text-[11px] text-gray-400 mt-0.5">
+                                <div className="flex items-center gap-2 text-[11px] text-gray-400 mt-0.5 flex-wrap">
                                   <span>{product.condition}</span>
                                   <span>•</span>
                                   <span>{formatAdminDate(product.created_at)}</span>
+                                  {typeof product.stock === 'number' && (
+                                    <>
+                                      <span>•</span>
+                                      <span className={`font-bold ${product.stock === 0 ? 'text-red-600' : 'text-gray-600'}`}>
+                                        Stock: {product.stock}
+                                      </span>
+                                    </>
+                                  )}
                                 </div>
+                                {isLegacyBlobUrl(product.image) && (
+                                  <p className="text-[10px] text-amber-700 font-bold mt-1">
+                                    Broken local blob URL — seller must re-upload image
+                                  </p>
+                                )}
                                 {product.flagReason && (
                                   <p className="text-[11px] text-red-600 font-bold mt-1 flex items-center gap-1">
                                     <AlertTriangle className="w-3 h-3 shrink-0" />
@@ -362,17 +381,24 @@ export const ProductManagement: React.FC = () => {
                           </td>
 
                           <td className="px-5 py-4">
-                            <span
-                              className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-black ${
-                                product.status === 'live'
-                                  ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                                  : product.status === 'flagged' || product.status === 'pending_approval'
-                                  ? 'bg-amber-50 text-amber-700 border border-amber-200'
-                                  : 'bg-red-50 text-red-700 border border-red-200'
-                              }`}
-                            >
-                              {statusLabel(product.status)}
-                            </span>
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              <span
+                                className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-black ${
+                                  product.status === 'live'
+                                    ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                    : product.status === 'flagged' || product.status === 'pending_approval'
+                                    ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                                    : 'bg-red-50 text-red-700 border border-red-200'
+                                }`}
+                              >
+                                {statusLabel(product.status)}
+                              </span>
+                              {product.is_resubmitted && product.status === 'pending_approval' && (
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                                  Resubmitted
+                                </span>
+                              )}
+                            </div>
                           </td>
 
                           <td className="px-5 py-4 text-right">
@@ -472,9 +498,26 @@ export const ProductManagement: React.FC = () => {
               >
                 <X className="w-5 h-5" />
               </button>
-              <div className="aspect-video w-full rounded-2xl overflow-hidden mb-4 bg-gray-100">
-                <img src={viewingProduct.image} alt={viewingProduct.name} className="w-full h-full object-cover" />
+              <div className="aspect-video w-full rounded-2xl overflow-hidden mb-3 bg-gray-100">
+                <ImageWithFallback src={viewingProduct.image} alt={viewingProduct.name} className="w-full h-full object-cover" />
               </div>
+              {Array.isArray(viewingProduct.images) && viewingProduct.images.length > 1 && (
+                <div className="flex gap-2 overflow-x-auto pb-2 mb-2">
+                  {viewingProduct.images.map((imgUrl, idx) => (
+                    <ImageWithFallback
+                      key={idx}
+                      src={imgUrl}
+                      alt={`${viewingProduct.name} photo ${idx + 1}`}
+                      className="w-12 h-12 rounded-xl object-cover border border-gray-200 shrink-0"
+                    />
+                  ))}
+                </div>
+              )}
+              {isLegacyBlobUrl(viewingProduct.image) && (
+                <p className="text-[11px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-3 py-2 rounded-xl mb-3">
+                  This older listing still references a browser-local blob URL that cannot load across devices.
+                </p>
+              )}
               <div className="space-y-3">
                 <div className="flex justify-between items-start gap-3">
                   <div>
@@ -482,6 +525,12 @@ export const ProductManagement: React.FC = () => {
                     <p className="text-xs text-gray-500">
                       {viewingProduct.seller.name} • {viewingProduct.university}
                     </p>
+                    {typeof viewingProduct.stock === 'number' && (
+                      <p className="text-xs font-bold text-gray-700 mt-1">
+                        Inventory: {viewingProduct.stock} units
+                        {formatStockStatus(viewingProduct.stock).label ? ` (${formatStockStatus(viewingProduct.stock).label})` : ''}
+                      </p>
+                    )}
                   </div>
                   <span className="text-xl font-black text-[#a14b58]">GH₵{viewingProduct.price.toLocaleString()}</span>
                 </div>

@@ -14,7 +14,9 @@ import { PackagePlus, CheckCircle2, XCircle, Eye, RefreshCw } from 'lucide-react
 import { toast } from 'sonner';
 import { AdminLayout } from './AdminLayout';
 import { AdminLoadingState, AdminErrorState } from '../../components/Admin/AdminStateFeedback';
+import { ImageWithFallback } from '../../components/common/ImageWithFallback';
 import { api } from '../../../lib/api';
+import { isLegacyBlobUrl } from '../../../lib/inventory';
 
 export const AdApprovals: React.FC = () => {
   const [products, setProducts] = useState<any[]>([]);
@@ -95,8 +97,8 @@ export const AdApprovals: React.FC = () => {
     if (s === 'rejected') return 'bg-red-50 text-red-700 border-red-100';
     return 'bg-amber-50 text-amber-700 border-amber-100';
   };
-  const statusLabel = (s: string) => {
-    if (s === 'pending_approval') return 'Pending Review';
+  const statusLabel = (s: string, isResubmitted?: boolean) => {
+    if (s === 'pending_approval') return isResubmitted ? 'Resubmitted / Pending Review' : 'Pending Review';
     if (s === 'live') return 'Live';
     if (s === 'rejected') return 'Rejected';
     if (s === 'all') return 'All';
@@ -158,14 +160,14 @@ export const AdApprovals: React.FC = () => {
                 transition={{ delay: i * 0.03 }}
                 className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm flex gap-4 items-start"
               >
-                <div className="w-20 h-20 rounded-xl overflow-hidden shrink-0 bg-gray-100">
-                  {p.image && <img src={p.image} alt={p.name} className="w-full h-full object-cover" />}
+                <div className="w-20 h-20 rounded-xl overflow-hidden shrink-0 bg-gray-100 border border-gray-100">
+                  <ImageWithFallback src={p.image} alt={p.name} className="w-full h-full object-cover" />
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-start justify-between gap-2 flex-wrap">
                     <h3 className="font-black text-gray-900">{p.name || p.title}</h3>
                     <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full border ${statusBadge(p.status)}`}>
-                      {statusLabel(p.status)}
+                      {statusLabel(p.status, p.is_resubmitted)}
                     </span>
                   </div>
                   <p className="text-[#a14b58] font-black mt-1">GH₵{Number(p.price).toLocaleString()}</p>
@@ -173,6 +175,8 @@ export const AdApprovals: React.FC = () => {
                     <span>{p.condition}</span>
                     <span>•</span>
                     <span>{p.category}</span>
+                    <span>•</span>
+                    <span>Stock: {p.stock ?? 1}</span>
                     {p.seller?.name && (
                       <>
                         <span>•</span>
@@ -186,6 +190,11 @@ export const AdApprovals: React.FC = () => {
                       </>
                     )}
                   </div>
+                  {isLegacyBlobUrl(p.image) && (
+                    <p className="text-[11px] text-amber-700 mt-1.5 font-medium">
+                      Legacy temporary image URL detected — ask seller to re-upload photo via Edit Listing.
+                    </p>
+                  )}
                   {p.rejectionReason && (
                     <p className="text-xs text-red-600 mt-2 bg-red-50 px-3 py-1.5 rounded-lg border border-red-100">
                       Rejection reason: {p.rejectionReason}
@@ -214,12 +223,22 @@ export const AdApprovals: React.FC = () => {
               onClick={(e) => e.stopPropagation()}
             >
               <h2 className="text-xl font-black text-gray-900 mb-6">Review Ad</h2>
-              <div className="h-48 rounded-2xl overflow-hidden bg-gray-100 mb-6">
-                {selected.image && <img src={selected.image} alt="" className="w-full h-full object-cover" />}
+              <div className="h-52 rounded-2xl overflow-hidden bg-gray-100 mb-3 border border-gray-100">
+                <ImageWithFallback src={selected.image} alt={selected.name || ''} className="w-full h-full object-cover" />
               </div>
+              {Array.isArray(selected.images) && selected.images.length > 1 && (
+                <div className="grid grid-cols-5 gap-2 mb-5">
+                  {selected.images.map((imgUrl: string, idx: number) => (
+                    <div key={idx} className="aspect-square rounded-xl overflow-hidden bg-gray-100 border border-gray-200">
+                      <ImageWithFallback src={imgUrl} alt="" className="w-full h-full object-cover" />
+                    </div>
+                  ))}
+                </div>
+              )}
               <div className="bg-gray-50 rounded-2xl p-4 space-y-2 text-sm mb-6">
                 <div className="flex justify-between"><span className="text-gray-500">Title</span><span className="font-bold">{selected.name || selected.title}</span></div>
                 <div className="flex justify-between"><span className="text-gray-500">Price</span><span className="font-bold text-[#a14b58]">GH₵{Number(selected.price).toLocaleString()}</span></div>
+                <div className="flex justify-between"><span className="text-gray-500">Available Stock</span><span className="font-bold">{selected.stock ?? 1} unit(s)</span></div>
                 <div className="flex justify-between"><span className="text-gray-500">Condition</span><span className="font-bold">{selected.condition}</span></div>
                 <div className="flex justify-between"><span className="text-gray-500">Category</span><span className="font-bold">{selected.category}</span></div>
                 {selected.seller?.name && <div className="flex justify-between"><span className="text-gray-500">Seller</span><span className="font-bold">{selected.seller.name}</span></div>}

@@ -14,6 +14,8 @@ from core.admin_views import (
     AdminRoleRequestListView,
     AdminSecurityAdminDetailView,
     AdminSecurityAdminsView,
+    AdminSupportDetailView,
+    AdminSupportListView,
     AdminUniversityDetailView,
     AdminUniversityListCreateView,
     AdminUserDetailView,
@@ -33,9 +35,10 @@ urlpatterns = [
     path("reviews/<int:pk>/", AdminReviewDetailView.as_view(), name="admin-review-detail"),
     path("role-requests/", AdminRoleRequestListView.as_view(), name="admin-role-requests"),
     path("role-requests/<int:pk>/", AdminRoleRequestDetailView.as_view(), name="admin-role-request-detail"),
+    path("support/", AdminSupportListView.as_view(), name="admin-support"),
+    path("support/<int:pk>/", AdminSupportDetailView.as_view(), name="admin-support-detail"),
     path("universities/", AdminUniversityListCreateView.as_view(), name="admin-universities"),
     path("universities/<int:pk>/", AdminUniversityDetailView.as_view(), name="admin-university-detail"),
     path("security/admins/", AdminSecurityAdminsView.as_view(), name="admin-security-admins"),
     path("security/admins/<int:pk>/", AdminSecurityAdminDetailView.as_view(), name="admin-security-admin-detail"),
 ]
-

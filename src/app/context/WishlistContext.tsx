@@ -2,31 +2,16 @@
  * ==============================================================================
  * WISHLIST CONTEXT (WishlistContext.tsx)
  * ==============================================================================
- * This React Context manages items saved by buyers for future viewing or purchase.
- *
- * Core Features:
- * 1. Persistent Storage:
- *    - Automatically synchronizes with browser `localStorage` using `wishlistStorage`.
- *    - Saved items remain available even if the student leaves or refreshes the page.
- * 2. Deduplication:
- *    - `addToWishlist(item)`: Checks whether an item ID is already in the wishlist
- *      before adding, preventing duplicates.
- * 3. Fast Status Lookup:
- *    - `isInWishlist(id)`: Returns boolean so heart icons can toggle color immediately
- *      (e.g., filled red vs. outline gray).
- * 4. Item Removal & Transfer:
- *    - `removeFromWishlist(id)`: Removes individual items.
- *    - Items can also be moved directly into the cart from the Wishlist page.
- *
- * How to use:
- * const { wishlist, addToWishlist, isInWishlist } = useWishlist();
+ * Synchronizes the logged-in buyer's wishlist with Django PostgreSQL (`/api/wishlist/`).
+ * Clears cleanly on sign-out and isolates data strictly to the authenticated account.
  * ==============================================================================
  */
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { wishlistStorage } from '../../lib/api';
+import { toast } from 'sonner';
+import { api } from '../../lib/api';
+import { useUser } from './UserContext';
 
-// Structure of an item saved in the user's wishlist
 export interface WishlistItem {
   id: string | number;
   name: string;
@@ -37,92 +22,129 @@ export interface WishlistItem {
   condition?: string;
   rating?: number;
   badge?: string;
+  stock?: number;
+  stock_label?: string | null;
 }
 
-// Methods and values exposed by useWishlist()
 interface WishlistContextType {
   wishlist: WishlistItem[];
-  addToWishlist: (item: WishlistItem) => void;
-  removeFromWishlist: (id: string | number) => void;
+  loading: boolean;
+  addToWishlist: (item: WishlistItem) => Promise<void>;
+  removeFromWishlist: (id: string | number) => Promise<void>;
   isInWishlist: (id: string | number) => boolean;
   clearWishlist: () => void;
+  refreshWishlist: () => Promise<void>;
   wishlistCount: number;
 }
 
-// Create the Wishlist Context
 const WishlistContext = createContext<WishlistContextType | undefined>(undefined);
 
-// ==============================================================================
-// WISHLIST PROVIDER COMPONENT
-// ==============================================================================
+function mapBackendWishlistRow(row: any): WishlistItem {
+  const p = row?.product || row || {};
+  return {
+    id: p.id,
+    name: p.title || p.name || 'Marketplace Item',
+    price: Number(p.price || 0),
+    image: p.image || '',
+    university: p.university_name || p.university || '',
+    category: p.category || p.category_name || '',
+    condition: p.condition || '',
+    rating: p.average_rating ?? p.rating,
+    stock: p.stock,
+    stock_label: p.stock_label ?? null,
+  };
+}
+
 export const WishlistProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { isLoggedIn, user } = useUser();
   const [wishlist, setWishlist] = useState<WishlistItem[]>([]);
+  const [loading, setLoading] = useState(false);
 
-  // Load saved wishlist from localStorage on component mount
+  const refreshWishlist = useCallback(async () => {
+    if (!isLoggedIn || !user) {
+      setWishlist([]);
+      return;
+    }
+    setLoading(true);
+    try {
+      const res = await api.get<any>('/wishlist/');
+      const rows = Array.isArray(res) ? res : Array.isArray(res?.results) ? res.results : [];
+      setWishlist(rows.map(mapBackendWishlistRow).filter((x: WishlistItem) => x.id !== undefined));
+    } catch {
+      // Do not populate stale or demo items when server fails
+    } finally {
+      setLoading(false);
+    }
+  }, [isLoggedIn, user?.id]);
+
   useEffect(() => {
-    setWishlist(wishlistStorage.get());
-  }, []);
+    refreshWishlist();
+  }, [refreshWishlist]);
 
-  /**
-   * Adds an item to the wishlist if not already present.
-   */
-  const addToWishlist = useCallback((item: WishlistItem) => {
-    setWishlist(prev => {
-      const exists = prev.some(w => String(w.id) === String(item.id));
-      if (exists) return prev; // Avoid duplicate entries
-      const updated = [item, ...prev];
-      wishlistStorage.save(updated);
-      return updated;
-    });
-  }, []);
+  const addToWishlist = useCallback(
+    async (item: WishlistItem) => {
+      if (!isLoggedIn) return;
+      const numericId = Number(item.id);
+      setWishlist((prev) => {
+        if (prev.some((w) => String(w.id) === String(item.id))) return prev;
+        return [item, ...prev];
+      });
+      if (!Number.isFinite(numericId) || numericId <= 0) return;
+      try {
+        await api.post('/wishlist/', { product_id: numericId });
+      } catch (err: any) {
+        setWishlist((prev) => prev.filter((w) => String(w.id) !== String(item.id)));
+        toast.error(err?.message || 'Unable to save item to your wishlist.');
+        throw err;
+      }
+    },
+    [isLoggedIn]
+  );
 
-  /**
-   * Removes an item from the wishlist by its ID.
-   */
-  const removeFromWishlist = useCallback((id: string | number) => {
-    setWishlist(prev => {
-      const updated = prev.filter(w => String(w.id) !== String(id));
-      wishlistStorage.save(updated);
-      return updated;
-    });
-  }, []);
+  const removeFromWishlist = useCallback(
+    async (id: string | number) => {
+      if (!isLoggedIn) return;
+      const previous = wishlist;
+      setWishlist((prev) => prev.filter((w) => String(w.id) !== String(id)));
+      const numericId = Number(id);
+      if (!Number.isFinite(numericId) || numericId <= 0) return;
+      try {
+        await api.delete(`/wishlist/${numericId}/`);
+      } catch (err: any) {
+        setWishlist(previous);
+        toast.error(err?.message || 'Unable to remove item from wishlist.');
+      }
+    },
+    [isLoggedIn, wishlist]
+  );
 
-  /**
-   * Checks if a given product ID is already saved in the user's wishlist.
-   * Used to highlight heart buttons in real-time.
-   */
-  const isInWishlist = useCallback((id: string | number): boolean => {
-    return wishlist.some(w => String(w.id) === String(id));
-  }, [wishlist]);
+  const isInWishlist = useCallback(
+    (id: string | number): boolean => wishlist.some((w) => String(w.id) === String(id)),
+    [wishlist]
+  );
 
-  /**
-   * Clears all items from the wishlist.
-   */
   const clearWishlist = useCallback(() => {
     setWishlist([]);
-    wishlistStorage.save([]);
   }, []);
 
   return (
-    <WishlistContext.Provider value={{
-      wishlist,
-      addToWishlist,
-      removeFromWishlist,
-      isInWishlist,
-      clearWishlist,
-      wishlistCount: wishlist.length,
-    }}>
+    <WishlistContext.Provider
+      value={{
+        wishlist,
+        loading,
+        addToWishlist,
+        removeFromWishlist,
+        isInWishlist,
+        clearWishlist,
+        refreshWishlist,
+        wishlistCount: wishlist.length,
+      }}
+    >
       {children}
     </WishlistContext.Provider>
   );
 };
 
-// ==============================================================================
-// CUSTOM HOOK: useWishlist()
-// ==============================================================================
-/**
- * Hook to consume wishlist state and action methods in any component.
- */
 export const useWishlist = () => {
   const ctx = useContext(WishlistContext);
   if (!ctx) throw new Error('useWishlist must be used within WishlistProvider');

@@ -200,11 +200,11 @@ export const Navbar = () => {
             {isLoggedIn && user ? (
               <Link
                 to="/profile"
+                aria-label="Account profile"
                 className="hidden sm:flex items-center space-x-2.5 p-1.5 pl-3 border border-gray-100 rounded-full hover:bg-gray-50 transition-all bg-white shadow-xs"
               >
                 <div className="hidden lg:flex flex-col items-end leading-none">
-                  <span className="text-xs font-bold text-gray-800">{user.name.split(' ')[0]}</span>
-                  <span className={`text-[10px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded border mt-0.5 ${roleConfig.pillBg}`}>
+                  <span className={`text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded border ${roleConfig.pillBg}`}>
                     {roleConfig.label}
                   </span>
                 </div>
@@ -214,7 +214,7 @@ export const Navbar = () => {
                     {user.profilePic ? (
                       <img src={user.profilePic} alt="Profile" className="w-full h-full object-cover" />
                     ) : (
-                      user.name[0]
+                      <User className="w-4 h-4" />
                     )}
                   </div>
                   <div className={`absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full border-2 border-white flex items-center justify-center ${roleConfig.dotBg}`}>
@@ -275,16 +275,20 @@ export const Navbar = () => {
                 >
                   <div className="flex items-center space-x-2.5">
                     <div className="relative">
-                      <div className="w-9 h-9 rounded-full bg-[#fcf6f7] flex items-center justify-center text-[#a14b58] font-bold border border-[#f3d7db]">
-                        {user.name[0]}
+                      <div className="w-9 h-9 rounded-full bg-[#fcf6f7] flex items-center justify-center text-[#a14b58] font-bold overflow-hidden border border-[#f3d7db]">
+                        {user.profilePic ? (
+                          <img src={user.profilePic} alt="Profile" className="w-full h-full object-cover" />
+                        ) : (
+                          <User className="w-4 h-4" />
+                        )}
                       </div>
                       <div className={`absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full border-2 border-white flex items-center justify-center ${roleConfig.dotBg}`}>
                         {roleConfig.icon}
                       </div>
                     </div>
                     <div>
-                      <span className="font-bold text-gray-800 block text-sm">{user.name.split(' ')[0]}</span>
-                      <span className="text-[10px] text-gray-400 block">{user.university}</span>
+                      <span className="font-bold text-gray-800 block text-sm">My Account</span>
+                      <span className="text-[10px] text-gray-400 block">{user.university || 'Unimart Student'}</span>
                     </div>
                   </div>
                   <span className={`text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded border ${roleConfig.pillBg}`}>

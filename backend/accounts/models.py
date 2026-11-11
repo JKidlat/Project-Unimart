@@ -114,7 +114,7 @@ class Profile(models.Model):
         help_text="Business or store name provided during seller registration."
     )
     profile_pic = models.CharField(
-        max_length=500,
+        max_length=1000,
         blank=True,
         null=True,
         help_text="URL or path to user's profile avatar."

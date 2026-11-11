@@ -552,10 +552,11 @@ export async function apiRequest<T = any>(
   const url = `${BASE_URL}${endpoint.startsWith('/') ? '' : '/'}${endpoint}`;
   const isPublicAuthRequest = PUBLIC_AUTH_PATHS.some((path) => endpoint.startsWith(path));
   const token = tokenStorage.getAccess();
+  const isFormData = typeof FormData !== 'undefined' && options.body instanceof FormData;
 
-  // Set default JSON Content-Type and merge incoming headers
+  // Set default JSON Content-Type unless uploading FormData (browser must generate boundary)
   const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
+    ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
     ...(options.headers as Record<string, string>),
   };
 
@@ -591,21 +592,37 @@ export async function apiRequest<T = any>(
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
+      const fieldErrors: Record<string, string> = {};
+      if (errorData && typeof errorData === 'object') {
+        Object.entries(errorData).forEach(([key, val]) => {
+          if (key === 'code' || key === 'email' && typeof val === 'string' && errorData.code) return;
+          if (Array.isArray(val)) {
+            const joined = val.map((v) => String(v)).filter(Boolean).join(' ');
+            if (joined) fieldErrors[key] = joined;
+          } else if (typeof val === 'string' && val.trim()) {
+            fieldErrors[key] = val.trim();
+          }
+        });
+      }
+
       let message = errorData.error || errorData.detail || errorData.message;
-      if (!message && errorData && typeof errorData === 'object') {
-        const firstVal = Object.values(errorData).flat().find(Boolean);
-        if (typeof firstVal === 'string') message = firstVal;
+      if (!message && Object.keys(fieldErrors).length > 0) {
+        message = Object.values(fieldErrors)[0];
+      }
+      if (response.status >= 500 && (!message || message.length > 220)) {
+        message = 'A server error occurred while processing your request. Please try again shortly.';
       }
       const apiErr: any = new Error(message || `Request failed with status ${response.status}`);
       if (errorData?.code) apiErr.code = errorData.code;
       if (errorData?.email) apiErr.email = errorData.email;
+      apiErr.fieldErrors = fieldErrors;
       apiErr.status = response.status;
       throw apiErr;
     }
 
     return await response.json();
   } catch (err: any) {
-    // If backend is offline or network fails, never serve mock fallbacks for privileged/database endpoints
+    // Never mask database/authenticated/core endpoints with local demo fallbacks
     if (err.name === 'TypeError' || err.message?.includes('Failed to fetch') || err.message?.includes('NetworkError')) {
       if (
         endpoint.startsWith('/admin') ||
@@ -613,9 +630,16 @@ export async function apiRequest<T = any>(
         endpoint.includes('/auth/') ||
         endpoint.includes('/kyc') ||
         endpoint.includes('/universities') ||
+        endpoint.includes('/support') ||
+        endpoint.includes('/messages') ||
+        endpoint.includes('/media') ||
+        endpoint.includes('/cart') ||
+        endpoint.includes('/wishlist') ||
+        endpoint.includes('/orders') ||
+        endpoint.includes('mine=true') ||
         endpoint.includes('status=all')
       ) {
-        throw new Error('Unable to reach the Unimart server. Please wait a moment and try again.');
+        throw new Error('Unable to reach the Unimart server. Please check your connection and try again.');
       }
       return handleMockFallback(endpoint, options);
     }
@@ -627,20 +651,15 @@ export async function apiRequest<T = any>(
 // 7. CONVENIENCE HTTP METHODS
 // ==============================================================================
 
-/**
- * Convenient shortcut methods for HTTP operations across the application:
- * - api.get('/products/')
- * - api.post('/products/', { title: 'Book', price: 40 })
- * - api.patch('/orders/123/', { status: 'completed' })
- * - api.delete('/products/123/')
- */
 export const api = {
   get: <T = any>(endpoint: string) => apiRequest<T>(endpoint, { method: 'GET' }),
-  post: <T = any>(endpoint: string, data?: any) => 
+  post: <T = any>(endpoint: string, data?: any) =>
     apiRequest<T>(endpoint, { method: 'POST', body: data ? JSON.stringify(data) : undefined }),
-  patch: <T = any>(endpoint: string, data?: any) => 
+  patch: <T = any>(endpoint: string, data?: any) =>
     apiRequest<T>(endpoint, { method: 'PATCH', body: data ? JSON.stringify(data) : undefined }),
   delete: <T = any>(endpoint: string) => apiRequest<T>(endpoint, { method: 'DELETE' }),
+  upload: <T = any>(endpoint: string, formData: FormData) =>
+    apiRequest<T>(endpoint, { method: 'POST', body: formData }),
 };
 
 // ==============================================================================

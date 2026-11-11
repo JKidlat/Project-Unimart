@@ -116,17 +116,19 @@ export const CookieConsentBanner: React.FC = () => {
         <div 
           role="region" 
           aria-label="Cookie Consent Banner"
-          className="fixed bottom-4 left-4 right-4 md:left-6 md:right-auto md:max-w-xl z-50 animate-in fade-in slide-in-from-bottom duration-300"
+          className="fixed bottom-20 md:bottom-6 left-4 right-4 md:left-6 md:right-auto md:max-w-xl z-50 animate-in fade-in slide-in-from-bottom duration-300"
         >
-          <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-3xl p-6 shadow-2xl shadow-gray-950/10 dark:shadow-black/50 backdrop-blur-md">
-            <div className="flex items-start gap-4">
+          <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-3xl p-5 sm:p-6 shadow-2xl shadow-gray-950/10 dark:shadow-black/50 backdrop-blur-md">
+            <div className="flex items-start gap-3 sm:gap-4">
               <div className="p-3 bg-rose-50 dark:bg-rose-950/50 text-[#a14b58] rounded-2xl shrink-0">
                 <Cookie className="w-6 h-6" />
               </div>
-              <div className="flex-1">
-                <h3 className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                  <span>Privacy & Cookie Preferences</span>
-                  
+              <div className="flex-1 min-w-0">
+                <h3 className="text-base font-bold text-gray-900 dark:text-white flex flex-wrap items-center gap-2">
+                  <span>Privacy &amp; Cookie Preferences</span>
+                  <span className="text-[10px] font-semibold uppercase bg-rose-50 dark:bg-rose-950/50 text-[#a14b58] dark:text-[#f48fb1] border border-[#a14b58]/20 px-2 py-0.5 rounded-full">
+                    Act 843
+                  </span>
                 </h3>
                 <p className="mt-1.5 text-xs sm:text-sm text-gray-600 dark:text-gray-400 leading-relaxed">
                   Unimart uses strictly necessary cookies for platform security, student session continuity, and core operations. Optional analytics and advertising cookies are only activated with your informed consent.

@@ -80,10 +80,9 @@ export const Footer = () => {
             <h3 className="text-white font-bold mb-6 text-sm uppercase tracking-wider">Support</h3>
             <ul className="space-y-3.5 text-sm">
               <li><Link to="/help-center" className="hover:text-[#a14b58] transition-colors">Help Center</Link></li>
-              <li><Link to="/help/report" className="hover:text-[#a14b58] transition-colors">Report an Issue</Link></li>
+              <li><Link to="/contact" className="hover:text-[#a14b58] transition-colors">Contact Support</Link></li>
               <li><Link to="/help/faq" className="hover:text-[#a14b58] transition-colors">FAQ</Link></li>
               <li><Link to="/safety" className="hover:text-[#a14b58] transition-colors">Safety Tips</Link></li>
-              <li><Link to="/contact" className="hover:text-[#a14b58] transition-colors">Contact Support</Link></li>
             </ul>
           </div>
 
@@ -106,10 +105,20 @@ export const Footer = () => {
         {/* ============================================================== */}
         {/* BOTTOM COPYRIGHT & LEGAL POLICIES                              */}
         {/* ============================================================== */}
-        <div className="pt-8 border-t border-gray-800 flex flex-col md:flex-row justify-between items-center gap-6">
-          <p className="text-xs text-gray-500">
-            © 2026 Unimart Ghana. All rights reserved. Registered under Ghana Data Protection Act (Act 843) & Electronic Transactions Act (Act 772).
-          </p>
+        <div className="pt-8 border-t border-gray-800 flex flex-col md:flex-row justify-between items-center gap-6 text-center md:text-left">
+          <div className="space-y-2">
+            <p className="text-xs text-gray-400">
+              © 2026 Unimart Ghana. All rights reserved. Registered under Ghana Data Protection Act (Act 843) &amp; Electronic Transactions Act (Act 772).
+            </p>
+            <div className="flex flex-wrap justify-center md:justify-start gap-2">
+              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wide bg-gray-800 text-gray-300 border border-gray-700">
+                Act 843 • Data Protection
+              </span>
+              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wide bg-gray-800 text-gray-300 border border-gray-700">
+                Act 772 • E-Transactions
+              </span>
+            </div>
+          </div>
           <div className="flex flex-wrap justify-center items-center gap-5 text-xs text-gray-400">
             <Link to="/legal" className="hover:text-white transition-colors">All 13 Legal Policies</Link>
             <Link to="/legal/terms" className="hover:text-white transition-colors">Terms</Link>

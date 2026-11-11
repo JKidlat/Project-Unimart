@@ -25,6 +25,7 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { api, tokenStorage } from '../../lib/api';
+import { prepareImageForUpload } from '../../lib/inventory';
 import { signInWithGooglePopup } from '../../lib/firebase';
 
 // Allowed user roles in Unimart
@@ -52,6 +53,12 @@ export interface UserProfile {
   profilePic: string | null;
   joinDate: string;
   referralCode: string;
+  ordersCount?: number;
+  wishlistCount?: number;
+  cartCount?: number;
+  referralsCount?: number;
+  unreadMessagesCount?: number;
+  supportTicketsCount?: number;
   is_staff?: boolean;
   is_superuser?: boolean;
   is_email_verified?: boolean;
@@ -70,6 +77,7 @@ interface UserContextType {
   linkGoogleAccount: (password?: string, cachedIdToken?: string) => Promise<UserProfile>;
   signup: (formData: any) => Promise<UserProfile>;
   updateProfile: (updates: Partial<UserProfile>) => Promise<void>;
+  uploadAvatar: (file: File) => Promise<string>;
   refreshUserProfile: () => Promise<UserProfile | null>;
   logout: () => void;
   notificationSettings: NotificationSettings;
@@ -98,11 +106,17 @@ function formatUserProfile(rawUser: any, fallback: Partial<UserProfile> = {}): U
     university: rawUser?.university_name || rawUser?.university || fallback.university || '',
     universityId: rawUser?.university_id ?? fallback.universityId ?? null,
     role: (rawUser?.role as UserRole) || fallback.role || 'Buyer',
-    profilePic: rawUser?.profile_pic || fallback.profilePic || null,
+    profilePic: rawUser?.profile_pic !== undefined ? rawUser.profile_pic : (fallback.profilePic || null),
     joinDate: rawUser?.date_joined
       ? new Date(rawUser.date_joined).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })
       : (fallback.joinDate || new Date().toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })),
     referralCode: rawUser?.referral_code || fallback.referralCode || `UNIM-${email.slice(0, 2).toUpperCase()}-2026`,
+    ordersCount: Number(rawUser?.orders_count ?? fallback.ordersCount ?? 0),
+    wishlistCount: Number(rawUser?.wishlist_count ?? fallback.wishlistCount ?? 0),
+    cartCount: Number(rawUser?.cart_count ?? fallback.cartCount ?? 0),
+    referralsCount: Number(rawUser?.referrals_count ?? fallback.referralsCount ?? 0),
+    unreadMessagesCount: Number(rawUser?.unread_messages_count ?? fallback.unreadMessagesCount ?? 0),
+    supportTicketsCount: Number(rawUser?.support_tickets_count ?? fallback.supportTicketsCount ?? 0),
     is_staff: rawUser?.is_staff ?? fallback.is_staff ?? false,
     is_superuser: rawUser?.is_superuser ?? fallback.is_superuser ?? false,
     is_email_verified: rawUser?.is_email_verified ?? fallback.is_email_verified ?? false,
@@ -246,6 +260,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const res = await api.post('/auth/register/', {
         email: formData.email,
         password: formData.password,
+        confirm_password: formData.confirmPassword,
         full_name: formData.fullName || formData.name,
         phone_number: formData.phoneNumber,
         university_id: formData.universityId || null,
@@ -318,6 +333,29 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   // ----------------------------------------------------------------------------
+  // Action: Upload Profile Picture to Persistent Backend Storage
+  // ----------------------------------------------------------------------------
+  const uploadAvatar = async (file: File): Promise<string> => {
+    const processed = await prepareImageForUpload(file, { maxDimension: 512, quality: 0.85 });
+    const formData = new FormData();
+    formData.append('file', processed);
+    const res = await api.upload<{ profile_pic: string; user: any }>('/auth/me/avatar/', formData);
+    if (!res?.profile_pic) {
+      throw new Error('Server did not return a saved image URL.');
+    }
+    if (res?.user && res.user.email) {
+      const formatted = formatUserProfile(res.user, user || {});
+      setUser(formatted);
+      tokenStorage.setUser(formatted);
+    } else if (user) {
+      const updated = { ...user, profilePic: res.profile_pic };
+      setUser(updated);
+      tokenStorage.setUser(updated);
+    }
+    return res.profile_pic;
+  };
+
+  // ----------------------------------------------------------------------------
   // Action: Update Notification Preferences
   // ----------------------------------------------------------------------------
   const updateNotificationSettings = (updates: Partial<NotificationSettings>) => {
@@ -347,6 +385,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
       linkGoogleAccount,
       signup,
       updateProfile,
+      uploadAvatar,
       refreshUserProfile,
       logout,
       notificationSettings,

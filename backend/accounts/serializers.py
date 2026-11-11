@@ -1,7 +1,8 @@
 from django.db import transaction
-from django.db.models import Q
+from django.db.models import Q, Sum
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
+from core.media import normalize_public_image_url
 from .models import Profile, KYCSubmission, RoleChangeRequest
 from universities.models import University
 from universities.catalog import resolve_university_by_text
@@ -20,12 +21,15 @@ class UserProfileSerializer(serializers.ModelSerializer):
     university_id = serializers.IntegerField(source='profile.university.id', read_only=True, default=None)
     is_vendor = serializers.BooleanField(source='profile.is_vendor', read_only=True, default=False)
     business_name = serializers.CharField(source='profile.business_name', read_only=True, default='')
-    profile_pic = serializers.CharField(source='profile.profile_pic', read_only=True, default=None)
+    profile_pic = serializers.SerializerMethodField()
     referral_code = serializers.CharField(source='profile.referral_code', read_only=True, default='')
     referrals_count = serializers.IntegerField(source='profile.referrals_count', read_only=True, default=0)
     role = serializers.SerializerMethodField()
     orders_count = serializers.SerializerMethodField()
     wishlist_count = serializers.SerializerMethodField()
+    cart_count = serializers.SerializerMethodField()
+    unread_messages_count = serializers.SerializerMethodField()
+    support_tickets_count = serializers.SerializerMethodField()
     kyc_status = serializers.SerializerMethodField()
     has_firebase_linked = serializers.SerializerMethodField()
 
@@ -36,9 +40,15 @@ class UserProfileSerializer(serializers.ModelSerializer):
             'is_email_verified', 'is_verified_student', 'date_joined', 'last_login',
             'university_id', 'university_name', 'university_short_name',
             'is_vendor', 'business_name', 'role', 'profile_pic', 'referral_code',
-            'referrals_count', 'orders_count', 'wishlist_count', 'kyc_status',
+            'referrals_count', 'orders_count', 'wishlist_count', 'cart_count',
+            'unread_messages_count', 'support_tickets_count', 'kyc_status',
             'has_firebase_linked',
         ]
+
+    def get_profile_pic(self, obj):
+        request = self.context.get('request') if hasattr(self, 'context') else None
+        raw = getattr(getattr(obj, 'profile', None), 'profile_pic', None)
+        return normalize_public_image_url(raw, request=request)
 
     def get_has_firebase_linked(self, obj):
         return bool(getattr(obj, 'firebase_uid', None))
@@ -63,6 +73,33 @@ class UserProfileSerializer(serializers.ModelSerializer):
         except Exception:
             return 0
 
+    def get_cart_count(self, obj):
+        try:
+            total = obj.cart_items.aggregate(total=Sum('quantity'))['total']
+            return int(total or 0)
+        except Exception:
+            return 0
+
+    def get_unread_messages_count(self, obj):
+        try:
+            from messaging.models import Message
+            return (
+                Message.objects.filter(
+                    Q(conversation__buyer=obj) | Q(conversation__seller=obj),
+                    is_read=False,
+                )
+                .exclude(sender=obj)
+                .count()
+            )
+        except Exception:
+            return 0
+
+    def get_support_tickets_count(self, obj):
+        try:
+            return obj.support_tickets.count()
+        except Exception:
+            return 0
+
     def get_kyc_status(self, obj):
         try:
             sub = obj.kyc_submissions.first()
@@ -80,7 +117,12 @@ class ProfileUpdateSerializer(serializers.Serializer):
     business_name = serializers.CharField(required=False, allow_blank=True)
     is_vendor = serializers.BooleanField(required=False)
     role = serializers.CharField(required=False)
-    profile_pic = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    profile_pic = serializers.CharField(required=False, allow_blank=True, allow_null=True, max_length=1000)
+
+    def validate_profile_pic(self, value):
+        if value and str(value).strip().lower().startswith('blob:'):
+            raise serializers.ValidationError("Please upload the image file instead of a temporary browser URL.")
+        return value
 
     def update(self, instance, validated_data):
         user = instance
@@ -138,10 +180,32 @@ class ProfileUpdateSerializer(serializers.Serializer):
 class RegisterSerializer(serializers.Serializer):
     """
     Serializer for user registration.
-    Enforces strong password validation, email normalization, and role constraints.
+    Enforces strong password validation, email normalization, descriptive validation errors,
+    and strict role constraints.
     """
-    email = serializers.EmailField(required=True)
-    password = serializers.CharField(write_only=True, required=True, min_length=8)
+    email = serializers.EmailField(
+        required=True,
+        error_messages={
+            "required": "Please enter your email address.",
+            "blank": "Please enter your email address.",
+            "invalid": "Please enter a valid email address.",
+        },
+    )
+    password = serializers.CharField(
+        write_only=True,
+        required=True,
+        min_length=8,
+        error_messages={
+            "required": "Please enter a password.",
+            "blank": "Please enter a password.",
+            "min_length": "Password must contain at least 8 characters.",
+        },
+    )
+    confirm_password = serializers.CharField(
+        write_only=True,
+        required=False,
+        allow_blank=True,
+    )
     full_name = serializers.CharField(required=False, allow_blank=True, default='')
     phone_number = serializers.CharField(required=False, allow_blank=True, default='')
     university_id = serializers.IntegerField(required=False, allow_null=True, default=None)
@@ -150,15 +214,6 @@ class RegisterSerializer(serializers.Serializer):
     role = serializers.CharField(required=False, default='Buyer')
     business_name = serializers.CharField(required=False, allow_blank=True, allow_null=True, default='')
     referral_code = serializers.CharField(required=False, allow_blank=True, default='')
-
-    def validate_password(self, value):
-        from django.contrib.auth.password_validation import validate_password
-        from django.core.exceptions import ValidationError as DjangoValidationError
-        try:
-            validate_password(value)
-        except DjangoValidationError as e:
-            raise serializers.ValidationError(list(e.messages))
-        return value
 
     def validate_role(self, value):
         clean = str(value).strip().title()
@@ -170,13 +225,64 @@ class RegisterSerializer(serializers.Serializer):
     def validate_email(self, value):
         normalized = value.strip().lower()
         if User.objects.filter(email__iexact=normalized).exists():
-            raise serializers.ValidationError("A user with this email already exists.")
+            raise serializers.ValidationError("An account with this email already exists.")
         return normalized
 
     def validate_university_id(self, value):
         if value is not None and not University.objects.filter(id=value).exists():
             raise serializers.ValidationError("Selected university does not exist.")
         return value
+
+    def validate(self, attrs):
+        from django.contrib.auth.password_validation import validate_password
+        from django.core.exceptions import ValidationError as DjangoValidationError
+
+        raw_email = attrs.get("email", "")
+        raw_name = (attrs.get("full_name") or "").strip()
+        password = attrs.get("password") or ""
+        confirm_password = self.initial_data.get("confirm_password")
+
+        if confirm_password is not None and password != str(confirm_password):
+            raise serializers.ValidationError({"confirm_password": "Passwords do not match."})
+
+        # If client supplied full_name/phone_number/university keys explicitly, reject blanks clearly
+        if "full_name" in self.initial_data and not raw_name:
+            raise serializers.ValidationError({"full_name": "Full name is required."})
+        if "phone_number" in self.initial_data and not (attrs.get("phone_number") or "").strip():
+            raise serializers.ValidationError({"phone_number": "Phone number is required."})
+        if (
+            ("university_id" in self.initial_data or "university" in self.initial_data)
+            and not attrs.get("university_id")
+            and not (attrs.get("university") or "").strip()
+        ):
+            raise serializers.ValidationError({"university": "Please select your university."})
+
+        role_val = attrs.get("role", "Buyer")
+        is_vendor = bool(attrs.get("is_vendor")) or role_val.lower() == "seller"
+        if is_vendor and "business_name" in self.initial_data and not (attrs.get("business_name") or "").strip():
+            raise serializers.ValidationError({"business_name": "Business or store name is required for seller accounts."})
+
+        temp_user = User(email=raw_email)
+        temp_user.full_name = raw_name
+        try:
+            validate_password(password, user=temp_user)
+        except DjangoValidationError as exc:
+            friendly_msgs = []
+            for msg in exc.messages:
+                lower = msg.lower()
+                if "too short" in lower:
+                    friendly_msgs.append("Password must contain at least 8 characters.")
+                elif "too common" in lower:
+                    friendly_msgs.append("Password is too common. Choose a stronger mix of letters, numbers, and symbols.")
+                elif "entirely numeric" in lower:
+                    friendly_msgs.append("Password cannot be all numbers. Include letters or symbols.")
+                elif "too similar" in lower:
+                    friendly_msgs.append("Password is too similar to your name or email address. Choose a more distinct password.")
+                else:
+                    friendly_msgs.append(msg)
+            raise serializers.ValidationError({"password": friendly_msgs})
+
+        return attrs
 
     @transaction.atomic
     def create(self, validated_data):

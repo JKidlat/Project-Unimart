@@ -2,11 +2,17 @@
 Authentication views for user registration, profile retrieval/update, and logout.
 """
 
+import hashlib
+import uuid
+from django.db import transaction
+from django.db.models import Q
 from rest_framework import generics, status
 from rest_framework.exceptions import AuthenticationFailed
+from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated, IsAdminUser
-from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework.views import APIView
+from rest_framework_simplejwt.tokens import BlacklistedToken, OutstandingToken, RefreshToken
 from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from rest_framework_simplejwt.views import TokenObtainPairView
@@ -18,6 +24,8 @@ from django.utils import timezone
 from django.utils.encoding import force_str
 from django.utils.http import urlsafe_base64_decode
 
+from core.media import store_uploaded_image
+from core.models import AccountDeletionAudit
 from core.permissions import IsEmailVerifiedForWrite, IsPlatformAdmin
 from .authentication import FirebaseAccountError, resolve_existing_firebase_user, verify_firebase_token
 from .emails import (
@@ -26,7 +34,7 @@ from .emails import (
     send_verification_email_detailed,
     verify_email_verification_token,
 )
-from .models import KYCSubmission, RoleChangeRequest
+from .models import KYCSubmission, Profile, RoleChangeRequest
 from .serializers import (
     RegisterSerializer,
     UserProfileSerializer,
@@ -47,7 +55,7 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
     """
     def validate(self, attrs):
         data = super().validate(attrs)
-        user_data = UserProfileSerializer(self.user).data
+        user_data = UserProfileSerializer(self.user, context=self.context).data
         data['tokens'] = {
             'access': data['access'],
             'refresh': data['refresh'],
@@ -67,7 +75,7 @@ class LoginView(TokenObtainPairView):
     throttle_scope = 'auth'
 
 
-def _issue_jwt_response(user, message, status_code=status.HTTP_200_OK, **extra):
+def _issue_jwt_response(user, message, status_code=status.HTTP_200_OK, request=None, **extra):
     """Build a consistent SimpleJWT + UserProfileSerializer response payload."""
     refresh = RefreshToken.for_user(user)
     access = str(refresh.access_token)
@@ -80,7 +88,7 @@ def _issue_jwt_response(user, message, status_code=status.HTTP_200_OK, **extra):
             'access': access,
             'refresh': refresh_str,
         },
-        'user': UserProfileSerializer(user).data,
+        'user': UserProfileSerializer(user, context={'request': request} if request else {}).data,
     }
     payload.update(extra)
     return Response(payload, status=status_code)
@@ -110,6 +118,7 @@ class RegisterView(generics.CreateAPIView):
             user,
             'Account created successfully. Please verify your email address.',
             status_code=status.HTTP_201_CREATED,
+            request=request,
             **extra,
         )
 
@@ -136,6 +145,7 @@ def _authenticate_with_google(request, password=None):
     return _issue_jwt_response(
         user,
         'Google account linked and signed in successfully.' if linked_now else 'Signed in with Google successfully.',
+        request=request,
         linked_now=linked_now,
     )
 
@@ -195,7 +205,7 @@ class VerifyEmailView(generics.GenericAPIView):
 
         return Response({
             'message': 'Your email address has been verified successfully.',
-            'user': UserProfileSerializer(user).data,
+            'user': UserProfileSerializer(user, context={'request': request}).data,
         })
 
 
@@ -355,7 +365,7 @@ class UserProfileView(generics.RetrieveUpdateAPIView):
         serializer.save()
         
         # Return refreshed full profile
-        return Response(UserProfileSerializer(instance).data)
+        return Response(UserProfileSerializer(instance, context={'request': request}).data)
 
 
 class UserListView(generics.ListAPIView):
@@ -471,5 +481,150 @@ class UserRoleChangeRequestView(generics.ListCreateAPIView):
         is_vendor = bool(getattr(getattr(user, 'profile', None), 'is_vendor', False))
         current_role = 'Seller' if is_vendor else 'Buyer'
         serializer.save(user=user, current_role=current_role, status='pending')
+
+
+class AvatarUploadView(APIView):
+    """Upload and permanently persist a profile picture for the authenticated user."""
+
+    permission_classes = [IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser]
+
+    def post(self, request):
+        file_obj = request.FILES.get('file') or request.FILES.get('avatar') or request.FILES.get('image')
+        if not file_obj:
+            return Response(
+                {'error': 'Please choose an image file (JPG, PNG, WebP, or GIF) to upload.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        stored = store_uploaded_image(file_obj, request, user=request.user, kind='avatar')
+        profile, _ = Profile.objects.get_or_create(user=request.user)
+        profile.profile_pic = stored['url']
+        profile.save(update_fields=['profile_pic'])
+
+        return Response(
+            {
+                'message': 'Profile picture updated successfully.',
+                'profile_pic': stored['url'],
+                'user': UserProfileSerializer(request.user, context={'request': request}).data,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
+class DeleteAccountView(APIView):
+    """
+    Authorized self-service account deletion under Ghana Data Protection Act (Act 843).
+    Requires verifying the authenticated user's password (or email confirmation for
+    passwordless Google accounts), revokes all JWT tokens, removes personal records,
+    and deletes the user or anonymizes/deactivates when financial ledger rows exist.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    @transaction.atomic
+    def post(self, request):
+        user = request.user
+        reason = (request.data.get('reason') or '').strip()
+
+        if user.is_superuser:
+            other_active_superusers = User.objects.filter(is_superuser=True, is_active=True).exclude(pk=user.pk).exists()
+            if not other_active_superusers:
+                return Response(
+                    {'error': 'Cannot delete the only remaining superuser account.'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+        if user.has_usable_password():
+            password = request.data.get('password') or request.data.get('current_password') or ''
+            if not password:
+                return Response(
+                    {'error': 'Please enter your current password to confirm account deletion.'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            if not user.check_password(password):
+                return Response(
+                    {'error': 'Incorrect password. Account deletion could not be authorized.'},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+        else:
+            confirm_email = (request.data.get('confirm_email') or '').strip().lower()
+            if confirm_email != user.email.lower():
+                return Response(
+                    {'error': 'Please enter your exact account email address to confirm account deletion.'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+        # Blacklist all active refresh tokens issued to this account
+        for token in OutstandingToken.objects.filter(user=user):
+            BlacklistedToken.objects.get_or_create(token=token)
+
+        from marketplace.models import CartItem, Product, WishlistItem
+        from orders.models import Order, OrderItem
+        from payments.models import Payment
+
+        has_orders = (
+            Order.objects.filter(buyer=user).exists()
+            or OrderItem.objects.filter(seller=user).exists()
+            or Payment.objects.filter(user=user).exists()
+        )
+
+        # Remove private shopping & verification artifacts
+        CartItem.objects.filter(user=user).delete()
+        WishlistItem.objects.filter(user=user).delete()
+        KYCSubmission.objects.filter(user=user).delete()
+        RoleChangeRequest.objects.filter(user=user).delete()
+
+        # Remove unpurchased listings; hide any listings referenced by OrderItem ledger rows
+        user_products = Product.objects.filter(seller=user)
+        for product in user_products:
+            if OrderItem.objects.filter(product=product).exists():
+                product.status = 'hidden'
+                product.is_available = False
+                product.stock = 0
+                product.save(update_fields=['status', 'is_available', 'stock', 'updated_at'])
+            else:
+                product.delete()
+
+        email_hash = hashlib.sha256(user.email.strip().lower().encode('utf-8')).hexdigest()
+        AccountDeletionAudit.objects.create(
+            deleted_user_id=user.id,
+            email_sha256=email_hash,
+            reason=reason,
+            had_transactions=has_orders,
+        )
+
+        if has_orders:
+            # Preserve financial/order ledger referential integrity while erasing all PII
+            profile = getattr(user, 'profile', None)
+            if profile:
+                profile.profile_pic = None
+                profile.business_name = ''
+                profile.university = None
+                profile.is_vendor = False
+                profile.save()
+            user.is_active = False
+            user.is_staff = False
+            user.is_superuser = False
+            user.is_verified_student = False
+            user.is_email_verified = False
+            user.full_name = 'Deleted User'
+            user.phone_number = ''
+            user.firebase_uid = None
+            user.email = f'deleted-{user.id}-{uuid.uuid4().hex[:8]}@anonymized.unimart.invalid'
+            user.set_unusable_password()
+            user.save()
+            mode = 'anonymized'
+        else:
+            user.delete()
+            mode = 'deleted'
+
+        return Response(
+            {
+                'message': 'Your account has been permanently deleted and your personal information removed.',
+                'mode': mode,
+            },
+            status=status.HTTP_200_OK,
+        )
 
 

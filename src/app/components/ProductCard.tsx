@@ -1,26 +1,3 @@
-/**
- * ==============================================================================
- * PRODUCT CARD COMPONENT (ProductCard.tsx)
- * ==============================================================================
- * This component renders an individual product listing in card format.
- * Used on the Home page, Shop catalog, Wishlist page, and Search results.
- *
- * Core Features:
- * 1. Image & Discount Display:
- *    - Uses `ImageWithFallback` to prevent broken image placeholders.
- *    - Calculates percentage savings when `oldPrice` is present (e.g. -15%).
- * 2. Auth Gating:
- *    - Clicking "Add to Cart" or the Heart "Wishlist" icon requires sign-in.
- *    - If an unauthenticated guest clicks, it displays a toast message and
- *      navigates to `/signin` with `returnTo` state.
- * 3. Wishlist Toggle:
- *    - Reads `isInWishlist(id)` from WishlistContext to dynamically color the heart
- *      icon (wine red when saved, outline gray when not saved).
- * 4. Micro-interactions:
- *    - Smooth hover lift effect using `motion.div`.
- * ==============================================================================
- */
-
 import React from 'react';
 import { Link, useNavigate } from 'react-router';
 import { Heart, ShoppingCart, Star, Zap } from 'lucide-react';
@@ -31,97 +8,109 @@ import { useCart } from '../context/CartContext';
 import { useWishlist } from '../context/WishlistContext';
 import { useUser } from '../context/UserContext';
 import { trackCartInterest, trackWishlistInterest } from '../utils/personalization';
+import { formatStockStatus } from '../../lib/inventory';
 
-// Product attributes required by this card
 interface Product {
   id: string | number;
   name: string;
+  title?: string;
   price: number;
   oldPrice?: number | null;
   image: string;
+  images?: string[];
   university?: string;
+  university_name?: string;
   category?: string;
   condition?: string;
   rating?: number;
+  average_rating?: number;
   badge?: string;
+  stock?: number;
 }
 
-// Props passed from parent lists (Shop, Home, etc.)
 interface ProductCardProps {
   product: Product;
-  /** Optional auth gating handler passed down from the Home landing page */
   requireAuth?: (target: string) => (e: React.MouseEvent) => void;
 }
 
 export const ProductCard = ({ product, requireAuth }: ProductCardProps) => {
-  // Global cart, wishlist, and authentication contexts
   const { addToCart, addItem } = useCart();
   const cartAdd = addToCart || addItem;
   const { addToWishlist, removeFromWishlist, isInWishlist } = useWishlist();
   const { isLoggedIn } = useUser();
   const navigate = useNavigate();
 
-  // Check if item is already saved in the buyer's wishlist
   const inWishlist = isInWishlist(product.id);
+  const title = product.name || product.title || 'Marketplace Item';
+  const coverImage = product.image || product.images?.[0] || '';
+  const stockInfo = formatStockStatus(product.stock);
+  const ratingVal = product.rating ?? product.average_rating;
 
-  // ----------------------------------------------------------------------------
-  // Handler: Add to Cart (with guest authentication check)
-  // ----------------------------------------------------------------------------
-  const handleAddToCart = (e: React.MouseEvent) => {
-    e.preventDefault(); // Prevent navigating to the product details page
+  const handleAddToCart = async (e: React.MouseEvent) => {
+    e.preventDefault();
     if (!isLoggedIn) {
       toast.error('Please sign in to add items to your cart');
       navigate('/signin', { state: { returnTo: `/product/${product.id}` } });
       return;
     }
-    if (cartAdd) {
-      cartAdd({
-        id: String(product.id),
-        name: product.name,
-        price: product.price,
-        image: product.image,
-        university: product.university || '',
-        category: product.category || 'general',
-      });
-      trackCartInterest(product.category);
+    if (stockInfo.isOutOfStock) {
+      toast.error(`"${title}" is currently out of stock.`);
+      return;
     }
-    toast.success(`${product.name} added to cart!`);
+    if (cartAdd) {
+      try {
+        await cartAdd({
+          id: String(product.id),
+          name: title,
+          price: Number(product.price),
+          image: coverImage,
+          university: product.university_name || product.university || '',
+          category: product.category || 'general',
+          stock: product.stock,
+        });
+        trackCartInterest(product.category);
+      } catch {
+        // Error already toasted inside CartContext
+      }
+    }
   };
 
-  // ----------------------------------------------------------------------------
-  // Handler: Save / Remove from Wishlist (with guest authentication check)
-  // ----------------------------------------------------------------------------
-  const handleWishlist = (e: React.MouseEvent) => {
-    e.preventDefault(); // Prevent navigating to product details page
+  const handleWishlist = async (e: React.MouseEvent) => {
+    e.preventDefault();
     if (!isLoggedIn) {
       toast.error('Please sign in to save items to your wishlist');
       navigate('/signin', { state: { returnTo: '/wishlist' } });
       return;
     }
     if (inWishlist) {
-      removeFromWishlist(product.id);
+      await removeFromWishlist(product.id);
       toast.success('Removed from wishlist');
     } else {
-      addToWishlist({
-        id: product.id,
-        name: product.name,
-        price: product.price,
-        image: product.image,
-        university: product.university,
-        category: product.category,
-        condition: product.condition,
-        rating: product.rating,
-        badge: product.badge,
-      });
-      trackWishlistInterest(product.category);
-      toast.success('Saved to wishlist!');
+      try {
+        await addToWishlist({
+          id: product.id,
+          name: title,
+          price: Number(product.price),
+          image: coverImage,
+          university: product.university_name || product.university,
+          category: product.category,
+          condition: product.condition,
+          rating: ratingVal,
+          badge: product.badge,
+          stock: product.stock,
+        });
+        trackWishlistInterest(product.category);
+        toast.success('Saved to wishlist!');
+      } catch {
+        // Error toasted in WishlistContext
+      }
     }
   };
 
-  // Calculate percentage discount if an older/original price is specified
-  const discount = product.oldPrice
-    ? Math.round(((product.oldPrice - product.price) / product.oldPrice) * 100)
-    : null;
+  const discount =
+    product.oldPrice && Number(product.oldPrice) > Number(product.price)
+      ? Math.round(((Number(product.oldPrice) - Number(product.price)) / Number(product.oldPrice)) * 100)
+      : null;
 
   return (
     <Link
@@ -130,19 +119,17 @@ export const ProductCard = ({ product, requireAuth }: ProductCardProps) => {
     >
       <motion.div
         whileHover={{ y: -4 }}
-        className="bg-white rounded-3xl overflow-hidden border border-gray-100 shadow-sm hover:shadow-xl transition-all duration-300 group"
+        className="bg-white rounded-3xl overflow-hidden border border-gray-100 shadow-sm hover:shadow-xl transition-all duration-300 group h-full flex flex-col"
       >
-        {/* ============================================================== */}
-        {/* Product Image & Floating Overlay Badges                        */}
-        {/* ============================================================== */}
         <div className="relative h-52 overflow-hidden bg-gray-50">
           <ImageWithFallback
-            src={product.image}
-            alt={product.name}
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+            src={coverImage}
+            alt={title}
+            className={`w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ${
+              stockInfo.isOutOfStock ? 'opacity-65 grayscale-[30%]' : ''
+            }`}
           />
 
-          {/* Promotional Badge (e.g. "Trending", "Hot Deal") */}
           {product.badge && (
             <div className="absolute top-3 left-3 bg-[#a14b58] text-white text-[10px] font-bold px-2.5 py-1 rounded-full flex items-center gap-1 shadow-md">
               <Zap className="w-3 h-3" />
@@ -150,14 +137,27 @@ export const ProductCard = ({ product, requireAuth }: ProductCardProps) => {
             </div>
           )}
 
-          {/* Percentage Discount Pill */}
-          {discount && (
+          {discount && !stockInfo.isOutOfStock && (
             <div className="absolute top-3 right-3 bg-green-500 text-white text-[10px] font-bold px-2.5 py-1 rounded-full shadow-md">
               -{discount}%
             </div>
           )}
 
-          {/* Wishlist Heart Toggle Button */}
+          {/* Inventory Visibility Pill — displayed only when stock < 10 */}
+          {stockInfo.label && (
+            <div
+              className={`absolute bottom-3 left-3 text-[10px] font-black px-2.5 py-1 rounded-full shadow-md border ${
+                stockInfo.tier === 'empty'
+                  ? 'bg-red-600 text-white border-red-700'
+                  : stockInfo.tier === 'critical'
+                  ? 'bg-red-50 text-red-700 border-red-200'
+                  : 'bg-amber-50 text-amber-800 border-amber-200'
+              }`}
+            >
+              {stockInfo.label}
+            </div>
+          )}
+
           <button
             id={`wishlist-${product.id}`}
             onClick={handleWishlist}
@@ -172,48 +172,45 @@ export const ProductCard = ({ product, requireAuth }: ProductCardProps) => {
           </button>
         </div>
 
-        {/* ============================================================== */}
-        {/* Product Information: Title, Campus, Rating, and Price           */}
-        {/* ============================================================== */}
-        <div className="p-4">
-          <div className="flex items-start justify-between gap-2 mb-2">
-            <h3 className="font-bold text-gray-900 text-sm leading-tight line-clamp-2 flex-1">
-              {product.name}
-            </h3>
+        <div className="p-4 flex-1 flex flex-col">
+          <div className="flex items-start justify-between gap-2 mb-1.5">
+            <h3 className="font-bold text-gray-900 text-sm leading-tight line-clamp-2 flex-1">{title}</h3>
           </div>
 
-          {/* Campus Tag */}
-          {((product as any).university_name || product.university || (product as any).seller_details?.university) && (
+          {(product.university_name || product.university || (product as any).seller_details?.university) && (
             <p className="text-[10px] text-gray-400 font-medium mb-2 truncate">
-              {(product as any).university_name || product.university || (product as any).seller_details?.university}
+              {product.university_name || product.university || (product as any).seller_details?.university}
             </p>
           )}
 
-          {/* Star Rating */}
-          {product.rating !== undefined && (
+          {ratingVal !== undefined && (
             <div className="flex items-center gap-1 mb-3">
               <Star className="w-3.5 h-3.5 fill-yellow-400 text-yellow-400" />
-              <span className="text-xs font-bold text-gray-700">{product.rating.toFixed(1)}</span>
+              <span className="text-xs font-bold text-gray-700">{Number(ratingVal).toFixed(1)}</span>
             </div>
           )}
 
-          {/* Price & Add to Cart Action */}
-          <div className="flex items-center justify-between mt-auto">
+          <div className="flex items-center justify-between mt-auto pt-1">
             <div>
-              <span className="text-lg font-black text-[#a14b58]">GH₵{product.price.toLocaleString()}</span>
-              {product.oldPrice && (
+              <span className="text-lg font-black text-[#a14b58]">GH₵{Number(product.price).toLocaleString()}</span>
+              {product.oldPrice && Number(product.oldPrice) > Number(product.price) && (
                 <span className="text-xs text-gray-400 line-through ml-2">
-                  GH₵{product.oldPrice.toLocaleString()}
+                  GH₵{Number(product.oldPrice).toLocaleString()}
                 </span>
               )}
             </div>
 
-            {/* Quick Add-to-Cart Button */}
             <button
               id={`add-to-cart-${product.id}`}
               onClick={handleAddToCart}
-              className="w-9 h-9 bg-[#a14b58] text-white rounded-xl flex items-center justify-center hover:bg-[#863b48] transition-all hover:scale-110 shadow-lg shadow-[#a14b581a]"
-              aria-label="Add to cart"
+              disabled={stockInfo.isOutOfStock}
+              className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all shadow-lg ${
+                stockInfo.isOutOfStock
+                  ? 'bg-gray-200 text-gray-400 cursor-not-allowed shadow-none'
+                  : 'bg-[#a14b58] text-white hover:bg-[#863b48] hover:scale-110 shadow-[#a14b581a]'
+              }`}
+              aria-label={stockInfo.isOutOfStock ? 'Out of stock' : 'Add to cart'}
+              title={stockInfo.isOutOfStock ? 'Out of stock' : 'Add to cart'}
             >
               <ShoppingCart className="w-4 h-4" />
             </button>

@@ -24,9 +24,14 @@ from rest_framework.views import APIView
 
 from accounts.models import KYCSubmission, Profile, RoleChangeRequest
 from accounts.serializers import RoleChangeRequestSerializer
+from core.media import normalize_public_image_url
+from core.models import SupportMessage, SupportTicket
 from core.permissions import IsPlatformAdmin
+from core.support_views import SupportTicketSerializer
 from marketplace.models import Product
+from marketplace.serializers import format_stock_label
 from orders.models import Order, OrderItem
+from orders.services import complete_order_and_deduct_inventory
 from payments.models import Payment
 from reviews.models import Review
 from universities.catalog import (
@@ -84,12 +89,17 @@ def _serialize_admin_user(user, buyer_totals=None, seller_totals=None, kyc_map=N
     }
 
 
-def _serialize_admin_product(product) -> dict:
+def _serialize_admin_product(product, request=None) -> dict:
     seller = product.seller
     profile = getattr(seller, "profile", None)
     seller_uni = getattr(profile, "university", None) if profile else None
     cat = product.category
     uni = product.university
+    primary_image = normalize_public_image_url(product.image or "", request=request) or ""
+    raw_gallery = getattr(product, "images", None) or []
+    gallery = [normalize_public_image_url(img, request=request) for img in raw_gallery if img]
+    if not gallery and primary_image:
+        gallery = [primary_image]
 
     return {
         "id": product.id,
@@ -97,14 +107,18 @@ def _serialize_admin_product(product) -> dict:
         "title": product.title,
         "price": float(product.price),
         "oldPrice": float(product.old_price) if product.old_price is not None else None,
+        "stock": int(product.stock or 0),
+        "stock_label": format_stock_label(product.stock),
         "category": cat.name if cat else "Others",
         "category_slug": cat.slug if cat else "others",
         "condition": product.condition,
         "status": product.status,
         "is_available": bool(product.is_available),
+        "is_resubmitted": bool(getattr(product, "is_resubmitted", False)),
         "flagReason": product.flag_reason or "",
         "rejectionReason": product.rejection_reason or "",
-        "image": product.image or "",
+        "image": primary_image,
+        "images": gallery,
         "description": product.description or "",
         "university": uni.name if uni else "",
         "university_short_name": uni.short_name if uni else "",
@@ -310,6 +324,7 @@ class AdminDashboardView(APIView):
 
         total_universities = University.objects.count()
         active_universities = University.objects.filter(is_active=True).count()
+        open_support_tickets = SupportTicket.objects.filter(status__in=["open", "in_progress"]).count()
 
         kyc_queue_qs = list(
             KYCSubmission.objects.select_related("user", "user__profile__university")
@@ -394,11 +409,13 @@ class AdminDashboardView(APIView):
                 "removed_reviews": removed_reviews,
                 "total_universities": total_universities,
                 "active_universities": active_universities,
+                "open_support_tickets": open_support_tickets,
             },
             "badges": {
                 "kyc": pending_kyc,
                 "ads": pending_ads,
                 "role_requests": pending_role_requests,
+                "support": open_support_tickets,
             },
             "revenue_series": _build_revenue_series(time_range, now),
             "pending_kyc_queue": kyc_queue,
@@ -492,6 +509,19 @@ class AdminActivityView(APIView):
                 "timestamp": r.created_at.isoformat() if r.created_at else None,
             })
 
+        for t in SupportTicket.objects.select_related("user", "user__profile__university").order_by("-created_at")[:20]:
+            uni = getattr(getattr(t.user, "profile", None), "university", None) if t.user else None
+            events.append({
+                "id": f"support-{t.id}",
+                "type": "support",
+                "message": f"Support #{t.id}: {t.subject} ({t.get_status_display()})",
+                "subtext": f"{t.category}" + (f" • Order #{t.order_reference}" if t.order_reference else ""),
+                "user": t.contact_name or t.contact_email,
+                "university": uni.name if uni else "Unassigned",
+                "amount": None,
+                "timestamp": t.created_at.isoformat() if t.created_at else None,
+            })
+
         events.sort(key=lambda e: e["timestamp"] or "", reverse=True)
 
         counts = {
@@ -501,6 +531,7 @@ class AdminActivityView(APIView):
             "payment": Payment.objects.count(),
             "kyc": KYCSubmission.objects.count(),
             "review": Review.objects.count(),
+            "support": SupportTicket.objects.count(),
         }
 
         if type_filter != "all":
@@ -688,7 +719,7 @@ class AdminProductListView(APIView):
 
         return Response({
             "stats": stats,
-            "results": [_serialize_admin_product(p) for p in qs],
+            "results": [_serialize_admin_product(p, request=request) for p in qs],
         })
 
 
@@ -712,6 +743,7 @@ class AdminProductDetailView(APIView):
             if next_status == "live":
                 product.flag_reason = ""
                 product.rejection_reason = ""
+                product.is_resubmitted = False
 
         if "flag_reason" in request.data or "flagReason" in request.data:
             product.flag_reason = (request.data.get("flag_reason") or request.data.get("flagReason") or "").strip()
@@ -724,8 +756,17 @@ class AdminProductDetailView(APIView):
         if "is_available" in request.data and next_status is None:
             product.is_available = bool(request.data.get("is_available"))
 
+        if "stock" in request.data:
+            try:
+                stock_val = int(request.data.get("stock"))
+            except (TypeError, ValueError):
+                return Response({"error": "Invalid stock quantity."}, status=status.HTTP_400_BAD_REQUEST)
+            if stock_val < 0:
+                return Response({"error": "Stock cannot be negative."}, status=status.HTTP_400_BAD_REQUEST)
+            product.stock = stock_val
+
         product.save()
-        return Response({"product": _serialize_admin_product(product)})
+        return Response({"product": _serialize_admin_product(product, request=request)})
 
     def delete(self, request, pk):
         product = generics.get_object_or_404(Product, pk=pk)
@@ -739,7 +780,7 @@ class AdminProductDetailView(APIView):
             return Response({
                 "message": "Listing has linked order history and was archived (hidden) instead of deleted.",
                 "archived": True,
-                "product": _serialize_admin_product(product),
+                "product": _serialize_admin_product(product, request=request),
             })
 
 
@@ -796,19 +837,24 @@ class AdminOrderDetailView(APIView):
         if action == "process_refund":
             order.refund_status = "refunded"
             order.status = "cancelled"
+            order.save()
         else:
-            if "status" in request.data:
-                next_status = request.data.get("status")
-                if next_status not in {c[0] for c in Order.STATUS_CHOICES}:
-                    return Response({"error": "Invalid order status."}, status=status.HTTP_400_BAD_REQUEST)
-                order.status = next_status
+            next_status = request.data.get("status")
+            if next_status is not None and next_status not in {c[0] for c in Order.STATUS_CHOICES}:
+                return Response({"error": "Invalid order status."}, status=status.HTTP_400_BAD_REQUEST)
             if "refund_status" in request.data:
                 next_refund = request.data.get("refund_status")
                 if next_refund not in {c[0] for c in Order.REFUND_STATUS_CHOICES}:
                     return Response({"error": "Invalid refund status."}, status=status.HTTP_400_BAD_REQUEST)
                 order.refund_status = next_refund
 
-        order.save()
+            if next_status == "completed":
+                order.save()
+                order = complete_order_and_deduct_inventory(order)
+            else:
+                if next_status is not None:
+                    order.status = next_status
+                order.save()
         return Response({"order": _serialize_admin_order(order)})
 
 
@@ -1132,4 +1178,94 @@ class AdminSecurityAdminDetailView(APIView):
         target.is_staff = False
         target.save(update_fields=["is_staff"])
         return Response({"message": f"Administrator access removed for {target.email}."})
+
+
+class AdminSupportListView(APIView):
+    """List all customer support tickets and status breakdown counts (Admin only)."""
+
+    permission_classes = [IsPlatformAdmin]
+
+    def get(self, request):
+        status_filter = (request.query_params.get("status") or "all").strip().lower()
+        search = (request.query_params.get("search") or "").strip()
+
+        all_qs = SupportTicket.objects.select_related(
+            "user", "user__profile", "user__profile__university", "responded_by"
+        ).prefetch_related("messages").order_by("-created_at")
+
+        counts = {
+            "all": all_qs.count(),
+            "open": all_qs.filter(status="open").count(),
+            "in_progress": all_qs.filter(status="in_progress").count(),
+            "resolved": all_qs.filter(status="resolved").count(),
+        }
+
+        qs = all_qs if status_filter == "all" else all_qs.filter(status=status_filter)
+        if search:
+            qs = qs.filter(
+                Q(subject__icontains=search)
+                | Q(description__icontains=search)
+                | Q(contact_name__icontains=search)
+                | Q(contact_email__icontains=search)
+                | Q(category__icontains=search)
+                | Q(order_reference__icontains=search)
+            )
+
+        return Response({
+            "counts": counts,
+            "results": SupportTicketSerializer(qs, many=True).data,
+        })
+
+
+class AdminSupportDetailView(APIView):
+    """Retrieve, respond to, or update status (`open`, `in_progress`, `resolved`) of a support ticket."""
+
+    permission_classes = [IsPlatformAdmin]
+
+    def get(self, request, pk):
+        ticket = generics.get_object_or_404(
+            SupportTicket.objects.select_related("user", "user__profile", "user__profile__university").prefetch_related(
+                "messages"
+            ),
+            pk=pk,
+        )
+        return Response({"ticket": SupportTicketSerializer(ticket).data})
+
+    @transaction.atomic
+    def patch(self, request, pk):
+        ticket = generics.get_object_or_404(
+            SupportTicket.objects.select_related("user", "user__profile", "user__profile__university").prefetch_related(
+                "messages"
+            ),
+            pk=pk,
+        )
+        next_status = request.data.get("status")
+        response_text = (request.data.get("admin_response") or request.data.get("response") or request.data.get("message") or "").strip()
+
+        if next_status is not None:
+            next_status_clean = str(next_status).strip().lower()
+            if next_status_clean not in {"open", "in_progress", "resolved"}:
+                return Response(
+                    {"error": "Status must be open, in_progress, or resolved."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            ticket.status = next_status_clean
+
+        if response_text:
+            SupportMessage.objects.create(
+                ticket=ticket,
+                sender=request.user,
+                sender_name=request.user.full_name or "Unimart Support Team",
+                is_admin=True,
+                message=response_text,
+            )
+            ticket.admin_response = response_text
+            ticket.responded_by = request.user
+            ticket.responded_at = timezone.now()
+            if next_status is None and ticket.status == "open":
+                ticket.status = "in_progress"
+
+        ticket.save()
+        ticket.refresh_from_db()
+        return Response({"ticket": SupportTicketSerializer(ticket).data})
 
