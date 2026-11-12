@@ -30,7 +30,8 @@ import {
   Home as HomeIcon, 
   Search as SearchIcon, 
   ShoppingCart as CartIcon, 
-  User as UserIcon 
+  User as UserIcon,
+  MessageCircle as MessageCircleIcon
 } from 'lucide-react';
 
 // ============================================================================
@@ -113,6 +114,7 @@ import { UserProvider, useUser } from './context/UserContext';
 import { KYCProvider } from './context/KYCContext';
 import { WishlistProvider } from './context/WishlistContext';
 import { CartProvider, useCart } from './context/CartContext';
+import { ChatProvider, useChat } from './context/ChatContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
 
 /**
@@ -156,6 +158,8 @@ const ScrollToTop = () => {
 const AppContent = () => {
   const location = useLocation();
   const { itemCount } = useCart();
+  const { toggleDrawer, unreadCount } = useChat();
+  const { isLoggedIn } = useUser();
   
   // Admin pages have their own custom sidebar & header in AdminLayout
   const isAdminPage = location.pathname.startsWith('/admin');
@@ -295,6 +299,23 @@ const AppContent = () => {
               </span>
             )}
           </Link>
+          {isLoggedIn && (
+            <button
+              onClick={toggleDrawer}
+              className="flex flex-col items-center gap-1 text-gray-400 hover:text-[#a14b58] transition-colors relative cursor-pointer"
+              aria-label="Messages"
+            >
+              <div className="w-6 h-6 flex items-center justify-center">
+                <MessageCircleIcon className="w-5 h-5" />
+              </div>
+              <span className="text-[10px] font-bold">Chat</span>
+              {unreadCount > 0 && (
+                <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-0.5 bg-[#a14b58] text-white text-[8px] flex items-center justify-center rounded-full font-bold">
+                  {unreadCount > 99 ? '99+' : unreadCount}
+                </span>
+              )}
+            </button>
+          )}
           <Link to="/profile" className="flex flex-col items-center gap-1 text-gray-400 hover:text-[#a14b58] transition-colors">
             <div className="w-6 h-6 flex items-center justify-center"><UserIcon className="w-5 h-5" /></div>
             <span className="text-[10px] font-bold">Profile</span>
@@ -320,9 +341,11 @@ const App = () => {
       <KYCProvider>
         <WishlistProvider>
           <CartProvider>
-            <Router>
-              <AppContent />
-            </Router>
+            <ChatProvider>
+              <Router>
+                <AppContent />
+              </Router>
+            </ChatProvider>
           </CartProvider>
         </WishlistProvider>
       </KYCProvider>

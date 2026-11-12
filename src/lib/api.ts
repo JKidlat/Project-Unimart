@@ -45,6 +45,8 @@ const PRODUCTS_KEY = 'unimart_products_store';
 const ORDERS_KEY = 'unimart_orders_store';
 const KYC_KEY = 'unimart_kyc_store';
 const WISHLIST_KEY = 'unimart_wishlist_store';
+const CONVERSATIONS_KEY = 'unimart_conversations_store';
+const MESSAGES_KEY = 'unimart_messages_store';
 
 /** 72 hours in milliseconds: Used to enforce session lifetime */
 const SESSION_TTL_MS = 72 * 60 * 60 * 1000;
@@ -118,6 +120,134 @@ export const wishlistStorage = {
   },
   /** Save updated array of wishlist items */
   save: (items: any[]) => localStorage.setItem(WISHLIST_KEY, JSON.stringify(items)),
+};
+
+// ==============================================================================
+// 2b. CHAT / MESSAGING STORAGE HELPER (offline demo mode)
+// ==============================================================================
+
+/**
+ * Default sample conversations for offline demo and initial testing.
+ */
+const INITIAL_CONVERSATIONS = [
+  {
+    id: 101,
+    buyer_id: 1,
+    seller_id: 999,
+    product_id: 1,
+    viewer_role: 'buyer',
+    counterparty: {
+      id: 999,
+      name: 'Kwame Mensah',
+      full_name: 'Kwame Mensah',
+      university: 'University of Ghana (UG)',
+      verified: true,
+      profile_pic: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80',
+      role: 'Seller',
+    },
+    product_details: {
+      id: 1,
+      title: 'MacBook Pro M1 (16GB, 512GB)',
+      price: 8500,
+      stock: 1,
+      image: 'https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=300&auto=format&fit=crop&q=80',
+    },
+    unread_count: 1,
+    created_at: new Date(Date.now() - 3600000 * 2).toISOString(),
+    updated_at: new Date(Date.now() - 60000 * 15).toISOString(),
+  },
+  {
+    id: 102,
+    buyer_id: 888,
+    seller_id: 1,
+    product_id: 2,
+    viewer_role: 'seller',
+    counterparty: {
+      id: 888,
+      name: 'Ama Boateng',
+      full_name: 'Ama Boateng',
+      university: 'KNUST',
+      verified: true,
+      profile_pic: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=100&auto=format&fit=crop&q=80',
+      role: 'Buyer',
+    },
+    product_details: {
+      id: 2,
+      title: 'Calculus: Early Transcendentals 8th Ed',
+      price: 180,
+      stock: 3,
+      image: 'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=300&auto=format&fit=crop&q=80',
+    },
+    unread_count: 1,
+    created_at: new Date(Date.now() - 3600000 * 5).toISOString(),
+    updated_at: new Date(Date.now() - 60000 * 45).toISOString(),
+  },
+];
+
+const INITIAL_MESSAGES = [
+  {
+    id: 1001,
+    conversation: 101,
+    sender_id: 1,
+    sender_name: 'Student',
+    sender_role: 'buyer',
+    body: 'Hello Kwame, is the MacBook still available?',
+    is_read: true,
+    created_at: new Date(Date.now() - 3600000 * 2).toISOString(),
+  },
+  {
+    id: 1002,
+    conversation: 101,
+    sender_id: 999,
+    sender_name: 'Kwame Mensah',
+    sender_role: 'seller',
+    body: 'Yes, it is! In great condition. Can meet at Balme Library at 2pm today if you want to inspect it.',
+    is_read: false,
+    created_at: new Date(Date.now() - 60000 * 15).toISOString(),
+  },
+  {
+    id: 1003,
+    conversation: 102,
+    sender_id: 888,
+    sender_name: 'Ama Boateng',
+    sender_role: 'buyer',
+    body: 'Hi! Can you do GH₵150 for the Calculus textbook? I can pick it up tomorrow morning.',
+    is_read: false,
+    created_at: new Date(Date.now() - 60000 * 45).toISOString(),
+  },
+];
+
+/**
+ * localStorage-backed chat store for offline / demo mode.
+ * Mimics the Django REST API shape consumed by ConversationInbox and ChatWindow.
+ */
+export const chatStorage = {
+  getConversations: (): any[] => {
+    try {
+      const stored = localStorage.getItem(CONVERSATIONS_KEY);
+      if (stored) return JSON.parse(stored);
+      localStorage.setItem(CONVERSATIONS_KEY, JSON.stringify(INITIAL_CONVERSATIONS));
+      return INITIAL_CONVERSATIONS;
+    } catch {
+      return INITIAL_CONVERSATIONS;
+    }
+  },
+  saveConversations: (list: any[]) => {
+    localStorage.setItem(CONVERSATIONS_KEY, JSON.stringify(list));
+  },
+  getMessages: (): any[] => {
+    try {
+      const stored = localStorage.getItem(MESSAGES_KEY);
+      if (stored) return JSON.parse(stored);
+      localStorage.setItem(MESSAGES_KEY, JSON.stringify(INITIAL_MESSAGES));
+      return INITIAL_MESSAGES;
+    } catch {
+      return INITIAL_MESSAGES;
+    }
+  },
+  saveMessages: (list: any[]) => {
+    localStorage.setItem(MESSAGES_KEY, JSON.stringify(list));
+  },
 };
 
 // ==============================================================================
@@ -521,6 +651,135 @@ async function handleMockFallback(endpoint: string, options: RequestInit = {}): 
     return { message: 'Payment verified', reference: body.reference, status: 'paid' };
   }
 
+  // --- Fallback 9: Chat Messages & Conversations ---
+  if (endpoint.includes('/messages/')) {
+    const currentUser = tokenStorage.getUser();
+    const userId = currentUser?.id || 1;
+    const userName = currentUser?.name || 'Student';
+    const userRole: 'buyer' | 'seller' = (currentUser?.role === 'Seller') ? 'seller' : 'buyer';
+
+    // GET /messages/conversations/ — list all conversations for this user
+    if (method === 'GET' && /\/messages\/conversations\/?$/.test(endpoint)) {
+      const conversations = chatStorage.getConversations().filter(
+        (c: any) => c.buyer_id === userId || c.seller_id === userId || c.buyer_id === 1 || c.seller_id === 1
+      );
+      const allMsgs = chatStorage.getMessages();
+      const enriched = conversations.map((c: any) => {
+        const thread = allMsgs.filter((m: any) => m.conversation === c.id);
+        const lastMsg = thread[thread.length - 1] || null;
+        const unread = thread.filter((m: any) => m.sender_id !== userId && !m.is_read).length;
+        return { ...c, last_message: lastMsg, unread_count: unread };
+      });
+      const totalUnread = enriched.reduce((sum: number, c: any) => sum + c.unread_count, 0);
+      return { unread_count: totalUnread, results: enriched };
+    }
+
+    // POST /messages/conversations/ — start or resume a conversation
+    if (method === 'POST' && /\/messages\/conversations\/?$/.test(endpoint)) {
+      const sellerId = body.seller_id || body.product_id || 999;
+      const productId = body.product_id || null;
+      const conversations = chatStorage.getConversations();
+
+      // Find existing conversation between this buyer and seller (and optionally product)
+      let conv = conversations.find(
+        (c: any) => c.buyer_id === userId && c.seller_id === sellerId &&
+          (productId ? c.product_id === productId : true)
+      );
+
+      if (!conv) {
+        // Create new conversation
+        conv = {
+          id: Date.now(),
+          buyer_id: userId,
+          seller_id: sellerId,
+          product_id: productId,
+          viewer_role: userRole,
+          counterparty: {
+            id: sellerId,
+            name: body.seller_name || 'Campus Seller',
+            full_name: body.seller_name || 'Campus Seller',
+            university: 'University of Ghana (UG)',
+            verified: true,
+            profile_pic: '',
+            role: userRole === 'buyer' ? 'Seller' : 'Buyer',
+          },
+          product_details: productId ? {
+            id: productId,
+            title: body.product_title || 'Campus Listing',
+            price: body.product_price || 0,
+            stock: 1,
+            image: '',
+          } : null,
+          unread_count: 0,
+          last_message: null,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        };
+        conversations.push(conv);
+        chatStorage.saveConversations(conversations);
+      }
+
+      const thread = chatStorage.getMessages().filter((m: any) => m.conversation === conv.id);
+      return { conversation: conv, messages: thread };
+    }
+
+    // GET /messages/conversations/:id/ — load thread for a conversation
+    const threadGetMatch = endpoint.match(/\/messages\/conversations\/(\d+)\/?$/);
+    if (method === 'GET' && threadGetMatch) {
+      const convId = Number(threadGetMatch[1]);
+      const conversations = chatStorage.getConversations();
+      const conv = conversations.find((c: any) => c.id === convId);
+      if (!conv) throw new Error('Conversation not found.');
+
+      // Mark messages as read for the current user
+      const allMsgs = chatStorage.getMessages();
+      const updated = allMsgs.map((m: any) =>
+        m.conversation === convId && m.sender_id !== userId ? { ...m, is_read: true } : m
+      );
+      chatStorage.saveMessages(updated);
+
+      const thread = updated.filter((m: any) => m.conversation === convId);
+      return { conversation: { ...conv, unread_count: 0 }, messages: thread };
+    }
+
+    // POST /messages/conversations/:id/messages/ — send a message
+    const sendMatch = endpoint.match(/\/messages\/conversations\/(\d+)\/messages\/?$/);
+    if (method === 'POST' && sendMatch) {
+      const convId = Number(sendMatch[1]);
+      const conversations = chatStorage.getConversations();
+      const convIdx = conversations.findIndex((c: any) => c.id === convId);
+      if (convIdx === -1) throw new Error('Conversation not found.');
+
+      const newMsg = {
+        id: Date.now(),
+        conversation: convId,
+        sender_id: userId,
+        sender_name: userName,
+        sender_role: userRole,
+        body: body.body || body.message || '',
+        is_read: false,
+        created_at: new Date().toISOString(),
+      };
+
+      const allMsgs = chatStorage.getMessages();
+      allMsgs.push(newMsg);
+      chatStorage.saveMessages(allMsgs);
+
+      // Update conversation's last_message + updated_at
+      conversations[convIdx] = {
+        ...conversations[convIdx],
+        last_message: newMsg,
+        updated_at: new Date().toISOString(),
+      };
+      chatStorage.saveConversations(conversations);
+
+      return { message: newMsg, conversation: conversations[convIdx] };
+    }
+
+    // Fallback for any other /messages/ call
+    return { results: [], unread_count: 0 };
+  }
+
   return { message: 'Success' };
 }
 
@@ -631,7 +890,6 @@ export async function apiRequest<T = any>(
         endpoint.includes('/kyc') ||
         endpoint.includes('/universities') ||
         endpoint.includes('/support') ||
-        endpoint.includes('/messages') ||
         endpoint.includes('/media') ||
         endpoint.includes('/cart') ||
         endpoint.includes('/wishlist') ||

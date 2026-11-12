@@ -75,6 +75,7 @@ interface ConversationInboxProps {
   emptyTitle?: string;
   emptySubtitle?: string;
   onUnreadChange?: (count: number) => void;
+  initialConversationId?: number | null;
 }
 
 export const ConversationInbox: React.FC<ConversationInboxProps> = ({
@@ -82,6 +83,7 @@ export const ConversationInbox: React.FC<ConversationInboxProps> = ({
   emptyTitle = 'No conversations yet',
   emptySubtitle = 'Start chatting with a student seller directly from any product page.',
   onUnreadChange,
+  initialConversationId,
 }) => {
   const { user } = useUser();
   const [conversations, setConversations] = useState<InboxConversation[]>([]);
@@ -117,6 +119,9 @@ export const ConversationInbox: React.FC<ConversationInboxProps> = ({
         onUnreadChange(res.unread_count);
       }
       setSelectedId((prev) => {
+        if (initialConversationId && list.some((c) => c.id === initialConversationId)) {
+          return initialConversationId;
+        }
         if (prev && list.some((c) => c.id === prev)) return prev;
         return list.length > 0 ? list[0].id : null;
       });
@@ -128,7 +133,14 @@ export const ConversationInbox: React.FC<ConversationInboxProps> = ({
     } finally {
       if (!silent) setLoadingList(false);
     }
-  }, [user, mode, onUnreadChange]);
+  }, [user, mode, onUnreadChange, initialConversationId]);
+
+  useEffect(() => {
+    if (initialConversationId) {
+      setSelectedId(initialConversationId);
+      setShowMobileThread(true);
+    }
+  }, [initialConversationId]);
 
   const fetchThread = useCallback(async (conversationId: number, silent = false) => {
     if (!silent) setLoadingThread(true);

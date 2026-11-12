@@ -34,11 +34,13 @@ export const Footer = () => {
           {/* COLUMN 1: BRAND IDENTITY & SOCIAL NETWORKS                     */}
           {/* ============================================================== */}
           <div className="space-y-6 lg:col-span-2">
-            <Link to="/" className="flex items-center space-x-2">
-              <div className="w-10 h-10 bg-gradient-to-br from-[#a14b58] to-[#6f323d] rounded-xl flex items-center justify-center shadow-lg shadow-[#a14b5833]">
-                <span className="text-white font-bold text-2xl">U</span>
-              </div>
-              <span className="text-2xl font-bold text-white">
+            <Link to="/" className="flex items-center space-x-2.5 group">
+              <img
+                src="/logo.png"
+                alt="Unimart Logo"
+                className="w-10 h-10 object-contain rounded-xl shadow-lg shadow-black/40 group-hover:scale-105 transition-transform"
+              />
+              <span className="text-2xl font-black text-white tracking-tight">
                 Unimart
               </span>
             </Link>

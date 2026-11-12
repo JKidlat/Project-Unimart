@@ -10,7 +10,7 @@
  * ==============================================================================
  */
 
-import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { api } from '../../lib/api';
 import { useUser } from './UserContext';
 
@@ -18,7 +18,7 @@ import { useUser } from './UserContext';
 // Types
 // ---------------------------------------------------------------------------
 
-interface ChatContextValue {
+export interface ChatContextType {
   /** Total number of unread messages across all conversations */
   unreadCount: number;
   /** Whether the floating chat drawer is currently visible */
@@ -39,17 +39,15 @@ interface ChatContextValue {
 // Context
 // ---------------------------------------------------------------------------
 
-const ChatContext = createContext<ChatContextValue>({
-  unreadCount: 0,
-  isDrawerOpen: false,
-  targetConversationId: null,
-  openDrawer: () => {},
-  closeDrawer: () => {},
-  toggleDrawer: () => {},
-  setUnreadCount: () => {},
-});
+const ChatContext = createContext<ChatContextType | undefined>(undefined);
 
-export const useChat = () => useContext(ChatContext);
+export const useChat = () => {
+  const context = useContext(ChatContext);
+  if (!context) {
+    throw new Error('useChat must be used within a ChatProvider');
+  }
+  return context;
+};
 
 // ---------------------------------------------------------------------------
 // Provider
@@ -116,22 +114,43 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const toggleDrawer = useCallback(() => {
-    setIsDrawerOpen((prev) => !prev);
-    if (isDrawerOpen) setTargetConversationId(null);
-  }, [isDrawerOpen]);
+    setIsDrawerOpen((prev) => {
+      const next = !prev;
+      if (!next) setTargetConversationId(null);
+      return next;
+    });
+  }, []);
+
+  const handleSetUnreadCount = useCallback((count: number) => {
+    setUnreadCount(count);
+  }, []);
+
+  // ---------------------------------------------------------------------------
+  // Stable Memoized Context Value
+  // ---------------------------------------------------------------------------
+  const contextValue = useMemo<ChatContextType>(
+    () => ({
+      unreadCount,
+      isDrawerOpen,
+      targetConversationId,
+      openDrawer,
+      closeDrawer,
+      toggleDrawer,
+      setUnreadCount: handleSetUnreadCount,
+    }),
+    [
+      unreadCount,
+      isDrawerOpen,
+      targetConversationId,
+      openDrawer,
+      closeDrawer,
+      toggleDrawer,
+      handleSetUnreadCount,
+    ]
+  );
 
   return (
-    <ChatContext.Provider
-      value={{
-        unreadCount,
-        isDrawerOpen,
-        targetConversationId,
-        openDrawer,
-        closeDrawer,
-        toggleDrawer,
-        setUnreadCount,
-      }}
-    >
+    <ChatContext.Provider value={contextValue}>
       {children}
     </ChatContext.Provider>
   );

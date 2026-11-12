@@ -118,9 +118,11 @@ export const AdminLogin: React.FC = () => {
         className="max-w-md w-full bg-white/10 backdrop-blur-xl border border-white/15 rounded-[2.5rem] p-8 md:p-10 shadow-2xl relative z-10"
       >
         <div className="text-center mb-7">
-          <div className="w-16 h-16 bg-gradient-to-br from-[#a14b58] to-[#c86371] rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-[#a14b58]/40 border border-white/20">
-            <ShieldCheck className="w-8 h-8 text-white" />
-          </div>
+          <img
+            src="/logo.png"
+            alt="Unimart Official Logo"
+            className="w-20 h-20 object-contain rounded-2xl mx-auto mb-4 shadow-xl shadow-black/50 border border-white/20"
+          />
           <span className="inline-block px-3 py-1 bg-[#a14b58]/30 text-[#f3d7db] text-[11px] font-extrabold uppercase tracking-widest rounded-full border border-[#a14b58]/40 mb-2">
             Restricted Access
           </span>

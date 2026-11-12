@@ -26,10 +26,12 @@
 
 import React, { useState, useMemo } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router';
-import { Search, ShoppingCart, User, Menu, X, Briefcase, ShieldCheck, Store, ShoppingBag } from 'lucide-react';
+import { Search, ShoppingCart, User, Menu, X, Briefcase, ShieldCheck, Store, ShoppingBag, MessageCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useUser } from '../context/UserContext';
 import { useCart } from '../context/CartContext';
+import { useChat } from '../context/ChatContext';
+import { ChatDrawer } from './Chat/ChatDrawer';
 
 export const Navbar = () => {
   // Local state for mobile menu toggle and search bar overlay
@@ -37,9 +39,10 @@ export const Navbar = () => {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [localSearch, setLocalSearch] = useState('');
 
-  // Global user and cart context
+  // Global user, cart, and chat context
   const { user, setSearchQuery, isLoggedIn } = useUser();
   const { itemCount } = useCart();
+  const { unreadCount, toggleDrawer, isDrawerOpen } = useChat();
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -129,6 +132,7 @@ export const Navbar = () => {
   }, [user?.role, user?.is_staff]);
 
   return (
+    <>
     <nav className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-[#f3d7db]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-20">
@@ -136,11 +140,13 @@ export const Navbar = () => {
           {/* ============================================================== */}
           {/* 1. BRAND LOGO                                                  */}
           {/* ============================================================== */}
-          <Link to="/" className="flex items-center space-x-2">
-            <div className="w-10 h-10 bg-gradient-to-br from-[#a14b58] to-[#6f323d] rounded-xl flex items-center justify-center shadow-lg shadow-[#a14b584d]">
-              <span className="text-white font-bold text-2xl">U</span>
-            </div>
-            <span className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-[#a14b58] to-[#6f323d]">
+          <Link to="/" className="flex items-center space-x-2.5 group">
+            <img
+              src="/logo.png"
+              alt="Unimart Logo"
+              className="w-10 h-10 object-contain rounded-xl shadow-md group-hover:scale-105 transition-transform"
+            />
+            <span className="text-2xl font-black bg-clip-text text-transparent bg-gradient-to-r from-[#a14b58] to-[#6f323d] tracking-tight">
               Unimart
             </span>
           </Link>
@@ -184,6 +190,24 @@ export const Navbar = () => {
                 </span>
               )}
             </Link>
+
+            {/* Chat Icon — visible to logged-in buyers and sellers only */}
+            {isLoggedIn && (
+              <button
+                onClick={toggleDrawer}
+                className={`p-2 relative transition-colors cursor-pointer ${
+                  isDrawerOpen ? 'text-[#a14b58]' : 'text-gray-600 hover:text-[#a14b58]'
+                }`}
+                aria-label="Open messages"
+              >
+                <MessageCircle className="w-5 h-5" />
+                {unreadCount > 0 && (
+                  <span className="absolute top-0 right-0 min-w-[16px] h-4 px-0.5 bg-[#a14b58] text-white text-[9px] flex items-center justify-center rounded-full font-black border border-white">
+                    {unreadCount > 99 ? '99+' : unreadCount}
+                  </span>
+                )}
+              </button>
+            )}
 
             {/* Admin Suite Quick Link (Visible only to authenticated admins) */}
             {isLoggedIn && (user?.role === 'Admin' || user?.is_staff) && (
@@ -351,5 +375,11 @@ export const Navbar = () => {
         )}
       </AnimatePresence>
     </nav>
+
+    {/* ============================================================== */}
+    {/* 6. GLOBAL CHAT DRAWER (slide-in from right, portal-rendered)   */}
+    {/* ============================================================== */}
+    <ChatDrawer />
+    </>
   );
 };

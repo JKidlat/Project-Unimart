@@ -102,9 +102,11 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
       {/* Top Mobile Bar */}
       <div className="lg:hidden bg-white border-b border-[#f3d7db] px-4 py-3 flex items-center justify-between sticky top-0 z-40 shadow-sm">
         <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 bg-gradient-to-br from-[#a14b58] to-[#c86371] rounded-xl flex items-center justify-center text-white font-black text-sm">
-            U
-          </div>
+          <img
+            src="/logo.png"
+            alt="Unimart"
+            className="w-8 h-8 object-contain rounded-xl shadow-xs shrink-0"
+          />
           <div>
             <h1 className="text-base font-black text-gray-900 leading-none">Unimart Admin</h1>
             <span className="text-[10px] text-[#a14b58] font-bold">Admin Suite</span>
@@ -129,9 +131,11 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
             {/* Sidebar Header */}
             <div className="p-5 border-b border-gray-100 flex items-center justify-between">
               <div className="flex items-center gap-3 overflow-hidden">
-                <div className="w-10 h-10 bg-gradient-to-br from-[#a14b58] to-[#c86371] rounded-2xl flex items-center justify-center text-white font-black text-lg shadow-md shrink-0">
-                  U
-                </div>
+                <img
+                  src="/logo.png"
+                  alt="Unimart"
+                  className="w-10 h-10 object-contain rounded-2xl shadow-md shrink-0"
+                />
                 {!isCollapsed && (
                   <div className="min-w-0">
                     <h2 className="font-black text-gray-900 text-base leading-tight truncate">Unimart</h2>

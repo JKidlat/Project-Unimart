@@ -126,9 +126,11 @@ export const Signin = () => {
       >
         {/* Header Icon & Greeting */}
         <div className="text-center mb-10">
-          <div className="w-16 h-16 bg-[#a14b58] rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg shadow-[#a14b584d]">
-            <ShieldCheck className="w-8 h-8 text-white" />
-          </div>
+          <img
+            src="/logo.png"
+            alt="Unimart Logo"
+            className="w-20 h-20 object-contain rounded-2xl mx-auto mb-6 shadow-xl shadow-[#a14b581a]"
+          />
           <h1 className="text-3xl font-black text-gray-900 mb-2">Welcome Back</h1>
           <p className="text-gray-500">Sign in to continue to Unimart</p>
         </div>
