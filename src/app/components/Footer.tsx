@@ -110,19 +110,14 @@ export const Footer = () => {
         <div className="pt-8 border-t border-gray-800 flex flex-col md:flex-row justify-between items-center gap-6 text-center md:text-left">
           <div className="space-y-2">
             <p className="text-xs text-gray-400">
-              © 2026 Unimart Ghana. All rights reserved. Registered under Ghana Data Protection Act (Act 843) &amp; Electronic Transactions Act (Act 772).
+              © 2026 Unimart Ghana. All rights reserved.
             </p>
             <div className="flex flex-wrap justify-center md:justify-start gap-2">
-              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wide bg-gray-800 text-gray-300 border border-gray-700">
-                Act 843 • Data Protection
-              </span>
-              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wide bg-gray-800 text-gray-300 border border-gray-700">
-                Act 772 • E-Transactions
-              </span>
-            </div>
+              
+              
+  </div>
           </div>
           <div className="flex flex-wrap justify-center items-center gap-5 text-xs text-gray-400">
-            <Link to="/legal" className="hover:text-white transition-colors">All 13 Legal Policies</Link>
             <Link to="/legal/terms" className="hover:text-white transition-colors">Terms</Link>
             <Link to="/legal/privacy" className="hover:text-white transition-colors">Privacy</Link>
             <Link to="/legal/cookies" className="hover:text-white transition-colors">Cookies</Link>
