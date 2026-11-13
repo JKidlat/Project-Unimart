@@ -10,7 +10,7 @@
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { useNavigate, Link } from 'react-router';
+import { useNavigate, Link, useSearchParams } from 'react-router';
 import {
   PackagePlus,
   ListOrdered,
@@ -75,6 +75,20 @@ const STATUS_ICONS: Record<string, React.ReactNode> = {
   cancelled: <XCircle className="w-4 h-4" />,
 };
 
+export const SUBORDER_STATUS_MAP: Record<string, { label: string; color: string }> = {
+  pending_response: { label: 'Action Needed: New Order', color: 'bg-amber-50 text-amber-800 border-amber-200' },
+  accepted: { label: 'Accepted by You', color: 'bg-indigo-50 text-indigo-700 border-indigo-200' },
+  awaiting_delivery_agreement: { label: 'Delivery Terms Pending', color: 'bg-blue-50 text-blue-700 border-blue-200' },
+  preparing: { label: 'Preparing Items', color: 'bg-purple-50 text-purple-700 border-purple-200' },
+  ready_for_collection: { label: 'Ready for Campus Pickup', color: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+  dispatched: { label: 'Dispatched for Delivery', color: 'bg-cyan-50 text-cyan-700 border-cyan-200' },
+  delivered: { label: 'Delivered to Buyer', color: 'bg-teal-50 text-teal-700 border-teal-200' },
+  completed: { label: 'Completed', color: 'bg-green-50 text-green-700 border-green-200' },
+  cancelled: { label: 'Cancelled', color: 'bg-red-50 text-red-700 border-red-200' },
+  rejected: { label: 'Declined by You', color: 'bg-red-50 text-red-700 border-red-200' },
+  issue_reported: { label: 'Issue Under Review', color: 'bg-rose-50 text-rose-800 border-rose-200' },
+};
+
 const CATEGORY_OPTIONS = [
   { value: 'groceries', label: 'Groceries' },
   { value: 'stationery', label: 'Stationery' },
@@ -104,8 +118,47 @@ export const SellerDashboard: React.FC = () => {
   const { user } = useUser();
   const { kycStatus } = useKYC();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<SellerTab>('post');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const validTabs: SellerTab[] = ['post', 'listings', 'orders', 'delivery', 'messages'];
+  const tabParam = searchParams.get('tab') as SellerTab | null;
+  const [activeTab, setActiveTab] = useState<SellerTab>(
+    tabParam && validTabs.includes(tabParam) ? tabParam : 'post'
+  );
   const [unreadMessages, setUnreadMessages] = useState(0);
+  const [pendingOrdersCount, setPendingOrdersCount] = useState(0);
+
+  const handleTabChange = useCallback((tab: SellerTab) => {
+    setActiveTab(tab);
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.set('tab', tab);
+        return next;
+      },
+      { replace: true }
+    );
+  }, [setSearchParams]);
+
+  useEffect(() => {
+    if (tabParam && validTabs.includes(tabParam) && tabParam !== activeTab) {
+      setActiveTab(tabParam);
+    }
+  }, [tabParam, activeTab]);
+
+  const refreshPendingOrders = useCallback(async () => {
+    if (!user || user.role === 'Buyer') return;
+    try {
+      const res = await api.get<any>('/orders/seller-orders/?status=pending_response');
+      const count = typeof res?.count === 'number' ? res.count : Array.isArray(res) ? res.length : 0;
+      setPendingOrdersCount(count);
+    } catch {
+      // ignore
+    }
+  }, [user]);
+
+  useEffect(() => {
+    refreshPendingOrders();
+  }, [refreshPendingOrders, activeTab]);
 
   useEffect(() => {
     if (!user || user.role === 'Buyer') return;
@@ -185,7 +238,7 @@ export const SellerDashboard: React.FC = () => {
   const tabs: { key: SellerTab; label: string; icon: React.ReactNode; badge?: number }[] = [
     { key: 'post', label: 'Post Ad', icon: <PackagePlus className="w-4 h-4" /> },
     { key: 'listings', label: 'My Listings', icon: <ListOrdered className="w-4 h-4" /> },
-    { key: 'orders', label: 'Orders', icon: <ShoppingBag className="w-4 h-4" /> },
+    { key: 'orders', label: 'Orders', icon: <ShoppingBag className="w-4 h-4" />, badge: pendingOrdersCount },
     { key: 'delivery', label: 'Delivery Settings', icon: <Truck className="w-4 h-4" /> },
     { key: 'messages', label: 'Messages', icon: <MessageSquare className="w-4 h-4" />, badge: unreadMessages },
   ];
@@ -212,7 +265,7 @@ export const SellerDashboard: React.FC = () => {
         {tabs.map((tab) => (
           <button
             key={tab.key}
-            onClick={() => setActiveTab(tab.key)}
+            onClick={() => handleTabChange(tab.key)}
             className={`flex items-center justify-center gap-1.5 py-3 px-2 rounded-xl font-bold text-xs sm:text-sm transition-all cursor-pointer relative ${
               activeTab === tab.key
                 ? 'bg-white text-[#a14b58] shadow-md border border-[#f3d7db]'
@@ -242,11 +295,11 @@ export const SellerDashboard: React.FC = () => {
           {activeTab === 'post' && (
             <PostAdTab
               user={user}
-              onCreated={() => setActiveTab('listings')}
+              onCreated={() => handleTabChange('listings')}
             />
           )}
           {activeTab === 'listings' && <MyListingsTab user={user} />}
-          {activeTab === 'orders' && <SellerOrdersTab />}
+          {activeTab === 'orders' && <SellerOrdersTab onOrdersUpdated={refreshPendingOrders} />}
           {activeTab === 'delivery' && <SellerDeliveryTab />}
           {activeTab === 'messages' && (
             <ConversationInbox
@@ -1612,7 +1665,7 @@ const SellerDeliveryTab: React.FC = () => {
 // ==============================================================================
 // SELLER ORDERS TAB (Multi-Vendor Suborders + 12h Deadline + Fulfilment Actions)
 // ==============================================================================
-const SellerOrdersTab: React.FC = () => {
+const SellerOrdersTab: React.FC<{ onOrdersUpdated?: () => void }> = ({ onOrdersUpdated }) => {
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -1645,6 +1698,7 @@ const SellerOrdersTab: React.FC = () => {
       const list = Array.isArray(data) ? data : data?.results || [];
       setOrders(list);
       setError(null);
+      onOrdersUpdated?.();
     } catch (err: any) {
       if (!silent) {
         setError(err?.message || 'Unable to load received orders.');
@@ -1652,7 +1706,7 @@ const SellerOrdersTab: React.FC = () => {
     } finally {
       if (!silent) setLoading(false);
     }
-  }, []);
+  }, [onOrdersUpdated]);
 
   useEffect(() => {
     loadOrders(false);
@@ -1667,6 +1721,7 @@ const SellerOrdersTab: React.FC = () => {
       await api.post(`/orders/seller-orders/${suborderId}/accept/`);
       toast.success('Order accepted! You can now prepare items and agree on delivery.');
       loadOrders(true);
+      onOrdersUpdated?.();
     } catch (err: any) {
       toast.error(err?.message || 'Failed to accept order.');
     } finally {
@@ -1690,6 +1745,7 @@ const SellerOrdersTab: React.FC = () => {
       setRejectingSuborder(null);
       setRejectReason('');
       loadOrders(true);
+      onOrdersUpdated?.();
     } catch (err: any) {
       toast.error(err?.message || 'Failed to decline order.');
     } finally {
@@ -1713,6 +1769,7 @@ const SellerOrdersTab: React.FC = () => {
       setCancellingSuborder(null);
       setCancelReason('');
       loadOrders(true);
+      onOrdersUpdated?.();
     } catch (err: any) {
       toast.error(err?.message || 'Failed to cancel order.');
     } finally {
@@ -1739,6 +1796,7 @@ const SellerOrdersTab: React.FC = () => {
       toast.success('Delivery proposal sent to buyer! Terms posted to order chat.');
       setProposingSuborder(null);
       loadOrders(true);
+      onOrdersUpdated?.();
     } catch (err: any) {
       toast.error(err?.message || 'Failed to propose delivery terms.');
     } finally {
@@ -1753,6 +1811,7 @@ const SellerOrdersTab: React.FC = () => {
       await api.patch(`/orders/seller-orders/${suborderId}/update-status/`, { status: nextStatus });
       toast.success(`Order status updated to "${nextStatus.replace(/_/g, ' ')}"!`);
       loadOrders(true);
+      onOrdersUpdated?.();
     } catch (err: any) {
       toast.error(err?.message || 'Failed to update order status.');
     } finally {
@@ -1979,7 +2038,7 @@ const SellerOrdersTab: React.FC = () => {
               <div className="pt-2 border-t border-gray-100 flex flex-wrap items-center justify-between gap-3">
                 <div className="flex flex-wrap items-center gap-2">
                   <Link
-                    to="/messages"
+                    to={sub.conversation_id ? `/messages?c=${sub.conversation_id}` : '/messages'}
                     className="inline-flex items-center gap-1.5 px-3 py-2 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-xl text-xs font-bold text-gray-700 transition-colors cursor-pointer"
                   >
                     <MessageSquare className="w-3.5 h-3.5 text-[#a14b58]" />

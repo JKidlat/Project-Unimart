@@ -76,6 +76,7 @@ export const Navbar = () => {
     if (user?.role === 'Seller') {
       return [
         { name: 'Shop', path: '/' },
+        { name: 'Orders', path: '/seller?tab=orders' },
         { name: 'Sell', path: '/seller' },
         { name: 'Messages', path: '/messages' },
         { name: 'Help', path: '/help-center' },

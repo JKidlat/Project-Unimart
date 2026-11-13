@@ -48,10 +48,11 @@ export const Profile = () => {
   const realSupportCount = Number(user.supportTicketsCount ?? 0);
 
   const menuItems = [
-    ...(isSeller ? [{ icon: Store, label: 'Seller Dashboard (Post Ads, Inbox & Orders)', path: '/seller', highlight: true }] : []),
+    ...(isSeller ? [{ icon: Store, label: 'Seller Dashboard (Post Ads, Inbox & Settings)', path: '/seller', highlight: true }] : []),
+    ...(isSeller ? [{ icon: ShoppingBag, label: 'Store Orders (Sales Received)', path: '/seller?tab=orders', highlight: true }] : []),
     ...(isAdmin ? [{ icon: ShieldCheck, label: 'Admin Control Center', path: '/admin', highlight: true }] : []),
     ...(!isSeller && !isAdmin ? [{ icon: Store, label: 'Become a Seller (KYC Verification)', path: '/kyc?mode=buyer_upgrade' }] : []),
-    { icon: ShoppingBag, label: 'Order History & Tracking', count: realOrdersCount, path: '/orders' },
+    { icon: ShoppingBag, label: isSeller ? 'My Purchases (Orders Placed)' : 'Order History & Tracking', count: realOrdersCount, path: '/orders' },
     { icon: ShoppingCart, label: 'Shopping Cart', count: realCartCount, path: '/cart' },
     { icon: Heart, label: 'Wishlist', count: realWishlistCount, path: '/wishlist' },
     { icon: Users, label: 'My Referrals', count: realReferralsCount, path: '/referrals' },
@@ -122,9 +123,9 @@ export const Profile = () => {
           </div>
 
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-10">
-            <Link to="/orders" className="bg-gray-50 hover:bg-gray-100 transition-colors rounded-2xl p-4 text-center border border-gray-100">
+            <Link to={isSeller ? "/seller?tab=orders" : "/orders"} className="bg-gray-50 hover:bg-gray-100 transition-colors rounded-2xl p-4 text-center border border-gray-100">
               <p className="text-2xl font-black text-gray-900">{realOrdersCount}</p>
-              <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Orders</p>
+              <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">{isSeller ? 'Store Orders' : 'Orders'}</p>
             </Link>
             <Link to="/cart" className="bg-gray-50 hover:bg-gray-100 transition-colors rounded-2xl p-4 text-center border border-gray-100">
               <p className="text-2xl font-black text-gray-900">{realCartCount}</p>

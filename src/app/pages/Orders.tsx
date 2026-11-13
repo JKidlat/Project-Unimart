@@ -225,6 +225,30 @@ export const Orders: React.FC = () => {
         </Link>
       </div>
 
+      {user?.role === 'Seller' && (
+        <div className="mb-8 p-5 rounded-3xl bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200/80 flex flex-wrap items-center justify-between gap-4 shadow-xs">
+          <div className="flex items-center gap-3.5">
+            <div className="w-11 h-11 rounded-2xl bg-amber-100/90 flex items-center justify-center text-amber-800 shrink-0 font-bold">
+              <Store className="w-6 h-6" />
+            </div>
+            <div>
+              <p className="font-black text-gray-900 text-sm">You are logged in as a Campus Seller</p>
+              <p className="text-xs text-gray-600 mt-0.5">
+                This page shows items you bought as a student buyer. To accept incoming orders and coordinate fulfilments for your store listings, open your Seller Orders dashboard.
+              </p>
+            </div>
+          </div>
+          <Link
+            to="/seller?tab=orders"
+            className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#a14b58] text-white rounded-xl text-xs font-bold hover:bg-[#863b48] transition-all shrink-0 shadow-md shadow-[#a14b5826] cursor-pointer"
+          >
+            <Package className="w-4 h-4" />
+            <span>Manage Store Orders</span>
+            <ArrowRight className="w-4 h-4" />
+          </Link>
+        </div>
+      )}
+
       {loading ? (
         <div className="py-20 text-center">
           <div className="w-10 h-10 border-4 border-[#a14b58] border-t-transparent rounded-full animate-spin mx-auto mb-4" />
