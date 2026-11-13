@@ -438,7 +438,7 @@ class OrderSerializer(serializers.ModelSerializer):
         sorted_pids = sorted(qty_by_product.keys())
         locked_products = {
             p.id: p
-            for p in Product.objects.select_for_update().select_related('seller', 'seller__profile').filter(id__in=sorted_pids).order_by('id')
+            for p in Product.objects.select_for_update().filter(id__in=sorted_pids).order_by('id')
         }
 
         # Validate product catalog availability and group by seller
