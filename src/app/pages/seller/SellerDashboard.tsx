@@ -1686,7 +1686,7 @@ const SellerOrdersTab: React.FC = () => {
       await api.post(`/orders/seller-orders/${rejectingSuborder.id}/reject/`, {
         reason: rejectReason.trim(),
       });
-      toast.info(`Suborder #${rejectingSuborder.suborder_number} declined.`);
+      toast.info(`Order #${rejectingSuborder.suborder_number} declined.`);
       setRejectingSuborder(null);
       setRejectReason('');
       loadOrders(true);
@@ -1709,7 +1709,7 @@ const SellerOrdersTab: React.FC = () => {
       await api.post(`/orders/seller-orders/${cancellingSuborder.id}/cancel/`, {
         reason: cancelReason.trim(),
       });
-      toast.info(`Suborder #${cancellingSuborder.suborder_number} cancelled.`);
+      toast.info(`Order #${cancellingSuborder.suborder_number} cancelled.`);
       setCancellingSuborder(null);
       setCancelReason('');
       loadOrders(true);
@@ -1751,10 +1751,10 @@ const SellerOrdersTab: React.FC = () => {
     setActionLoadingId(suborderId);
     try {
       await api.patch(`/orders/seller-orders/${suborderId}/update-status/`, { status: nextStatus });
-      toast.success(`Suborder status updated to "${nextStatus.replace(/_/g, ' ')}"!`);
+      toast.success(`Order status updated to "${nextStatus.replace(/_/g, ' ')}"!`);
       loadOrders(true);
     } catch (err: any) {
-      toast.error(err?.message || 'Failed to update suborder status.');
+      toast.error(err?.message || 'Failed to update order status.');
     } finally {
       setActionLoadingId(null);
     }
@@ -1867,10 +1867,7 @@ const SellerOrdersTab: React.FC = () => {
                 <div>
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="font-black text-gray-900 text-base">
-                      Suborder #{sub.suborder_number}
-                    </span>
-                    <span className="text-xs text-gray-400 font-mono">
-                      (Master: #{sub.master_order_number || sub.master_order_id})
+                      Order #{sub.suborder_number}
                     </span>
                     <span
                       className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full border ${statusConfig.color}`}
@@ -1884,7 +1881,7 @@ const SellerOrdersTab: React.FC = () => {
                 </div>
 
                 <div className="text-right">
-                  <span className="text-xs text-gray-400 block">Suborder Total</span>
+                  <span className="text-xs text-gray-400 block">Order Total</span>
                   <span className="text-xl font-black text-[#a14b58]">
                     GH₵{Number(sub.total_amount || 0).toFixed(2)}
                   </span>
@@ -2077,7 +2074,7 @@ const SellerOrdersTab: React.FC = () => {
                     onClick={() => setCancellingSuborder(sub)}
                     className="text-xs text-gray-400 hover:text-red-600 font-semibold cursor-pointer"
                   >
-                    Cancel Suborder
+                    Cancel Order
                   </button>
                 )}
               </div>
@@ -2092,7 +2089,7 @@ const SellerOrdersTab: React.FC = () => {
           <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4">
             <div className="flex items-center justify-between border-b border-gray-100 pb-3">
               <h3 className="font-black text-gray-900 text-base">
-                Propose Delivery for #{proposingSuborder.suborder_number}
+                Propose Delivery for Order #{proposingSuborder.suborder_number}
               </h3>
               <button
                 onClick={() => setProposingSuborder(null)}
@@ -2191,7 +2188,7 @@ const SellerOrdersTab: React.FC = () => {
           <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4">
             <div className="flex items-center justify-between border-b border-gray-100 pb-3">
               <h3 className="font-black text-gray-900 text-base">
-                Decline Suborder #{rejectingSuborder.suborder_number}
+                Decline Order #{rejectingSuborder.suborder_number}
               </h3>
               <button
                 onClick={() => setRejectingSuborder(null)}
@@ -2245,7 +2242,7 @@ const SellerOrdersTab: React.FC = () => {
           <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4">
             <div className="flex items-center justify-between border-b border-gray-100 pb-3">
               <h3 className="font-black text-gray-900 text-base">
-                Cancel Suborder #{cancellingSuborder.suborder_number}
+                Cancel Order #{cancellingSuborder.suborder_number}
               </h3>
               <button
                 onClick={() => setCancellingSuborder(null)}

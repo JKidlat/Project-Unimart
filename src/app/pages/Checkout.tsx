@@ -191,7 +191,7 @@ export const Checkout: React.FC = () => {
                 </div>
               </div>
               <span className="text-xs font-bold px-3 py-1 bg-gray-100 text-gray-700 rounded-full">
-                {sellerGroups.length} Suborder{sellerGroups.length === 1 ? '' : 's'}
+                {sellerGroups.length} Package{sellerGroups.length === 1 ? '' : 's'}
               </span>
             </div>
 
@@ -526,7 +526,7 @@ export const Checkout: React.FC = () => {
                 <span>12-Hour Seller Confirmation Guarantee</span>
               </p>
               <p className="text-gray-400 leading-relaxed">
-                Each seller receives their suborder instantly and has 12 hours to accept and coordinate delivery with you in chat.
+                Each seller receives their order instantly and has 12 hours to accept and coordinate delivery with you in chat.
               </p>
             </div>
           </div>

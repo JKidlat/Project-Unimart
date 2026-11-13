@@ -527,7 +527,7 @@ export const ConversationInbox: React.FC<ConversationInboxProps> = ({
                 <div className="flex items-center gap-2 min-w-0">
                   <Package className="w-4 h-4 text-[#a14b58] shrink-0" />
                   <span className="font-bold text-gray-900 truncate">
-                    Suborder #{selectedConversation.suborder_details.suborder_number}
+                    Order #{selectedConversation.suborder_details.suborder_number}
                   </span>
                   <span className="text-gray-500 hidden sm:inline">• {selectedConversation.suborder_details.status_display}</span>
                 </div>
