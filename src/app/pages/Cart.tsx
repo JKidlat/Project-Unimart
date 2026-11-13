@@ -47,7 +47,7 @@ export const Cart: React.FC = () => {
         {isMultiVendor && (
           <div className="inline-flex items-center gap-2 px-3.5 py-1.5 bg-rose-50 border border-rose-200 text-[#a14b58] rounded-xl text-xs font-bold">
             <Store className="w-4 h-4" />
-            <span>Multi-Vendor Order — Split into independent seller deliveries</span>
+            <span>Multiple Sellers — Items delivered directly by each seller</span>
           </div>
         )}
       </div>

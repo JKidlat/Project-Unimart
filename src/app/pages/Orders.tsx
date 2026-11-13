@@ -213,7 +213,7 @@ export const Orders: React.FC = () => {
         <div>
           <h1 className="text-3xl font-black text-gray-900">Your Orders</h1>
           <p className="text-gray-500 text-sm mt-0.5">
-            Track multi-vendor campus purchases, delivery arrangements, and handover statuses
+            Track your campus purchases, delivery arrangements, and handover statuses
           </p>
         </div>
         <Link
@@ -245,7 +245,7 @@ export const Orders: React.FC = () => {
         <div className="text-center py-20 bg-white rounded-3xl border border-gray-100 p-8 shadow-sm">
           <h2 className="text-2xl font-bold text-gray-900 mb-2">Sign in to view your orders</h2>
           <p className="text-gray-500 mb-8 max-w-sm mx-auto text-sm">
-            Access multi-vendor order updates, seller delivery agreements, and direct handover tracking.
+            Access order updates, seller delivery agreements, and direct handover tracking.
           </p>
           <Link
             to="/signin"

@@ -155,8 +155,7 @@ export const Checkout: React.FC = () => {
       refreshCart().catch(() => {});
       refreshUserProfile().catch(() => {});
 
-      const subCount = createdOrder?.seller_orders?.length || sellerGroups.length;
-      toast.success(`Master Order placed! Divided into ${subCount} independent seller orders.`);
+      toast.success('Order submitted');
       navigate('/orders');
     } catch (err: any) {
       toast.error(err.message || 'Failed to submit order. Please try again.');
@@ -465,7 +464,7 @@ export const Checkout: React.FC = () => {
         {/* Order Summary Sidebar */}
         <div className="lg:col-span-1">
           <div className="bg-white rounded-3xl p-6 sm:p-8 border border-gray-100 shadow-xl sticky top-28 space-y-6">
-            <h2 className="text-xl font-bold text-gray-900">Multi-Vendor Summary</h2>
+            <h2 className="text-xl font-bold text-gray-900">Order Summary</h2>
 
             <div className="space-y-3 max-h-52 overflow-y-auto pr-1">
               {sellerGroups.map((group) => {
@@ -512,10 +511,10 @@ export const Checkout: React.FC = () => {
               className="w-full bg-[#a14b58] text-white py-4 rounded-2xl font-bold text-sm sm:text-base hover:bg-[#863b48] transition-all flex items-center justify-center gap-2 shadow-xl shadow-[#a14b5833] disabled:opacity-50 cursor-pointer"
             >
               {loading ? (
-                <span>Placing Orders...</span>
+                <span>Placing Order...</span>
               ) : (
                 <>
-                  <span>Place Multi-Vendor Order</span>
+                  <span>Place Order</span>
                   <ArrowRight className="w-5 h-5" />
                 </>
               )}
