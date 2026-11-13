@@ -9,16 +9,33 @@ class MessageSerializer(serializers.ModelSerializer):
     sender_id = serializers.IntegerField(read_only=True)
     sender_name = serializers.SerializerMethodField()
     sender_role = serializers.SerializerMethodField()
+    proposal_details = serializers.SerializerMethodField()
 
     class Meta:
         model = Message
-        fields = ["id", "conversation", "sender_id", "sender_name", "sender_role", "body", "is_read", "created_at"]
-        read_only_fields = ["id", "conversation", "sender_id", "sender_name", "sender_role", "is_read", "created_at"]
+        fields = [
+            "id",
+            "conversation",
+            "sender_id",
+            "sender_name",
+            "sender_role",
+            "message_type",
+            "body",
+            "proposal",
+            "proposal_details",
+            "metadata",
+            "is_read",
+            "created_at",
+        ]
+        read_only_fields = [
+            "id", "conversation", "sender_id", "sender_name", "sender_role",
+            "message_type", "proposal", "proposal_details", "metadata", "is_read", "created_at"
+        ]
 
     def get_sender_name(self, obj):
         u = obj.sender
         if not u:
-            return "Student"
+            return "System"
         profile = getattr(u, "profile", None)
         if obj.conversation and obj.sender_id == obj.conversation.seller_id:
             if profile and profile.business_name:
@@ -26,9 +43,31 @@ class MessageSerializer(serializers.ModelSerializer):
         return u.full_name or u.email.split("@")[0]
 
     def get_sender_role(self, obj):
+        if not obj.sender_id:
+            return "system"
         if obj.conversation and obj.sender_id == obj.conversation.seller_id:
             return "seller"
         return "buyer"
+
+    def get_proposal_details(self, obj):
+        p = obj.proposal
+        if not p:
+            return None
+        return {
+            "id": p.id,
+            "seller_order_id": p.seller_order_id,
+            "proposed_by_id": p.proposed_by_id,
+            "fulfilment_method": p.fulfilment_method,
+            "fulfilment_method_display": p.get_fulfilment_method_display(),
+            "proposed_fee": float(p.proposed_fee),
+            "delivery_location": p.delivery_location,
+            "estimated_delivery": p.estimated_delivery,
+            "notes": p.notes,
+            "status": p.status,
+            "rejection_reason": p.rejection_reason,
+            "created_at": p.created_at.isoformat() if p.created_at else None,
+            "responded_at": p.responded_at.isoformat() if p.responded_at else None,
+        }
 
 
 class ConversationSerializer(serializers.ModelSerializer):
@@ -37,6 +76,7 @@ class ConversationSerializer(serializers.ModelSerializer):
     viewer_role = serializers.SerializerMethodField()
     last_message = serializers.SerializerMethodField()
     unread_count = serializers.SerializerMethodField()
+    suborder_details = serializers.SerializerMethodField()
 
     class Meta:
         model = Conversation
@@ -46,6 +86,8 @@ class ConversationSerializer(serializers.ModelSerializer):
             "seller_id",
             "product_id",
             "product_details",
+            "seller_order_id",
+            "suborder_details",
             "counterparty",
             "viewer_role",
             "last_message",
@@ -65,6 +107,23 @@ class ConversationSerializer(serializers.ModelSerializer):
             "price": float(p.price),
             "stock": p.stock,
             "image": normalize_public_image_url(p.image, request=request),
+        }
+
+    def get_suborder_details(self, obj):
+        so = obj.seller_order
+        if not so:
+            return None
+        return {
+            "id": so.id,
+            "suborder_number": so.suborder_number,
+            "status": so.status,
+            "status_display": so.get_status_display(),
+            "subtotal": float(so.subtotal),
+            "confirmed_delivery_fee": float(so.confirmed_delivery_fee),
+            "fulfilment_method": so.fulfilment_method,
+            "fulfilment_method_display": so.get_fulfilment_method_display(),
+            "delivery_location": so.delivery_location,
+            "estimated_delivery": so.estimated_delivery,
         }
 
     def get_counterparty(self, obj):
@@ -104,6 +163,7 @@ class ConversationSerializer(serializers.ModelSerializer):
             "id": last.id,
             "body": last.body,
             "sender_id": last.sender_id,
+            "message_type": last.message_type,
             "is_read": last.is_read,
             "created_at": last.created_at.isoformat(),
         }
@@ -114,4 +174,3 @@ class ConversationSerializer(serializers.ModelSerializer):
         if not me:
             return 0
         return obj.messages.filter(is_read=False).exclude(sender=me).count()
-

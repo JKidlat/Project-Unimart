@@ -22,11 +22,14 @@ interface ChatMessage {
   sender_name: string;
   sender_role: 'buyer' | 'seller';
   body: string;
+  message_type?: 'text' | 'system' | 'delivery_proposal';
   created_at: string;
 }
 
 interface ChatWindowProps {
   productId?: number | string;
+  sellerOrderId?: number | string;
+  suborderId?: number | string;
   seller: {
     id: number | string;
     name: string;
@@ -35,7 +38,7 @@ interface ChatWindowProps {
   onClose: () => void;
 }
 
-export const ChatWindow: React.FC<ChatWindowProps> = ({ productId, seller, onClose }) => {
+export const ChatWindow: React.FC<ChatWindowProps> = ({ productId, sellerOrderId, suborderId, seller, onClose }) => {
   const { user } = useUser();
   const [conversationId, setConversationId] = useState<number | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -50,8 +53,16 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ productId, seller, onClo
     setError(null);
     try {
       const payload: Record<string, any> = {};
-      if (productId) payload.product_id = Number(productId);
-      else if (seller?.id) payload.seller_id = Number(seller.id);
+      const targetOrderId = sellerOrderId || suborderId;
+      if (targetOrderId) {
+        payload.seller_order_id = Number(targetOrderId);
+      }
+      if (productId) {
+        payload.product_id = Number(productId);
+      }
+      if (seller?.id) {
+        payload.seller_id = Number(seller.id);
+      }
 
       const res = await api.post<{ conversation: { id: number }; messages: ChatMessage[] }>(
         '/messages/conversations/',
@@ -64,7 +75,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ productId, seller, onClo
     } finally {
       setLoading(false);
     }
-  }, [productId, seller?.id]);
+  }, [productId, sellerOrderId, suborderId, seller?.id]);
 
   useEffect(() => {
     initConversation();
@@ -188,6 +199,15 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ productId, seller, onClo
           </div>
         ) : (
           messages.map((msg) => {
+            if (msg.message_type === 'system') {
+              return (
+                <div key={msg.id} className="flex justify-center my-2">
+                  <div className="bg-gray-200/80 text-gray-700 text-[11px] px-3 py-1 rounded-full text-center max-w-[85%] font-medium">
+                    {msg.body}
+                  </div>
+                </div>
+              );
+            }
             const isMine = user ? Number(msg.sender_id) === Number(user.id) : msg.sender_role === 'buyer';
             return (
               <div key={msg.id} className={`flex ${isMine ? 'justify-end' : 'justify-start'}`}>

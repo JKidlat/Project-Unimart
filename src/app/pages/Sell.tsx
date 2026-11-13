@@ -10,6 +10,7 @@ import {
   Upload,
   Info,
   X,
+  Truck,
 } from 'lucide-react';
 import { useUser } from '../context/UserContext';
 import { toast } from 'sonner';
@@ -44,6 +45,14 @@ export const Sell = () => {
     category: '',
     description: '',
     condition: 'New',
+    override_delivery_settings: false,
+    delivery_methods: ['personal_delivery', 'buyer_collection'] as string[],
+    delivery_coverage: 'same_campus',
+    delivery_fee_type: 'fixed',
+    base_delivery_fee: '0.00',
+    collection_location: '',
+    preparation_time: 'Same Day',
+    delivery_instructions: '',
   });
 
   if (!user) {
@@ -125,7 +134,7 @@ export const Sell = () => {
         throw new Error('Could not upload product images. Please try again.');
       }
 
-      await api.post('/products/', {
+      const payload: Record<string, any> = {
         title: formData.title.trim(),
         price: Number(formData.price),
         oldPrice: formData.oldPrice ? Number(formData.oldPrice) : null,
@@ -135,7 +144,20 @@ export const Sell = () => {
         description: formData.description.trim(),
         image: urls[0],
         images: urls,
-      });
+        override_delivery_settings: formData.override_delivery_settings,
+      };
+
+      if (formData.override_delivery_settings) {
+        payload.delivery_methods = formData.delivery_methods;
+        payload.delivery_coverage = formData.delivery_coverage;
+        payload.delivery_fee_type = formData.delivery_fee_type;
+        payload.base_delivery_fee = Number(formData.base_delivery_fee || 0);
+        payload.collection_location = formData.collection_location.trim();
+        payload.preparation_time = formData.preparation_time;
+        payload.delivery_instructions = formData.delivery_instructions.trim();
+      }
+
+      await api.post('/products/', payload);
 
       toast.success('Ad submitted for review! Once approved by an admin, it will be published in the shop.');
       navigate('/seller');
@@ -351,6 +373,114 @@ export const Sell = () => {
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
             />
           </div>
+
+          {/* Delivery & Fulfilment Override */}
+          <div className="p-5 bg-gray-50 rounded-2xl border border-gray-200 space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <Truck className="w-5 h-5 text-[#a14b58]" />
+                <span className="text-sm font-bold text-gray-900">Custom Delivery Preferences</span>
+              </div>
+              <label className="flex items-center gap-2 text-xs font-bold text-gray-700 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={formData.override_delivery_settings}
+                  onChange={(e) => setFormData((p) => ({ ...p, override_delivery_settings: e.target.checked }))}
+                  className="w-4 h-4 text-[#a14b58] rounded border-gray-300"
+                />
+                Override store delivery settings
+              </label>
+            </div>
+
+            {formData.override_delivery_settings && (
+              <div className="pt-3 border-t border-gray-200 space-y-4 text-xs">
+                <div>
+                  <label className="font-bold text-gray-700 block mb-2">Available Handover Methods</label>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    {[
+                      { id: 'personal_delivery', label: 'Personal Delivery (In-Person)' },
+                      { id: 'buyer_collection', label: 'Buyer Collection / Pickup' },
+                      { id: 'campus_courier', label: 'Campus Courier Service' },
+                    ].map((m) => {
+                      const checked = formData.delivery_methods.includes(m.id);
+                      return (
+                        <button
+                          key={m.id}
+                          type="button"
+                          onClick={() => {
+                            setFormData((p) => {
+                              const exists = p.delivery_methods.includes(m.id);
+                              const updated = exists
+                                ? p.delivery_methods.filter((x) => x !== m.id)
+                                : [...p.delivery_methods, m.id];
+                              return { ...p, delivery_methods: updated.length ? updated : [m.id] };
+                            });
+                          }}
+                          className={`p-2.5 rounded-xl border text-xs font-bold text-left transition-all cursor-pointer ${
+                            checked
+                              ? 'border-[#a14b58] bg-[#fcf6f7] text-[#a14b58]'
+                              : 'border-gray-200 bg-white text-gray-600'
+                          }`}
+                        >
+                          {m.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="font-bold text-gray-700 block mb-1">Base Delivery Fee (GH₵)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.5"
+                      value={formData.base_delivery_fee}
+                      onChange={(e) => setFormData((p) => ({ ...p, base_delivery_fee: e.target.value }))}
+                      className="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-[#a14b58] outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="font-bold text-gray-700 block mb-1">Campus Coverage</label>
+                    <select
+                      value={formData.delivery_coverage}
+                      onChange={(e) => setFormData((p) => ({ ...p, delivery_coverage: e.target.value }))}
+                      className="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-[#a14b58] outline-none"
+                    >
+                      <option value="same_campus">Same Campus Only</option>
+                      <option value="cross_campus">Cross-Campus Allowed</option>
+                      <option value="all">Any Campus / All Regions</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="font-bold text-gray-700 block mb-1">Preparation Time</label>
+                    <select
+                      value={formData.preparation_time}
+                      onChange={(e) => setFormData((p) => ({ ...p, preparation_time: e.target.value }))}
+                      className="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-[#a14b58] outline-none"
+                    >
+                      <option value="Same Day">Same Day</option>
+                      <option value="1-2 Days">1-2 Days</option>
+                      <option value="3-5 Days">3-5 Days</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="font-bold text-gray-700 block mb-1">Collection / Pickup Location</label>
+                  <input
+                    type="text"
+                    value={formData.collection_location}
+                    onChange={(e) => setFormData((p) => ({ ...p, collection_location: e.target.value }))}
+                    placeholder="e.g. Unity Hall Forecourt"
+                    className="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-[#a14b58] outline-none"
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+
           <div className="p-4 bg-rose-50/60 rounded-2xl border border-[#f3d7db] text-xs text-gray-600 flex items-start gap-2.5">
             <Info className="w-4 h-4 text-[#a14b58] shrink-0 mt-0.5" />
             <p>

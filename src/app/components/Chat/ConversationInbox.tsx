@@ -19,6 +19,9 @@ import {
   RefreshCw,
   ExternalLink,
   AlertCircle,
+  Package,
+  Truck,
+  CheckCircle2,
 } from 'lucide-react';
 import { api } from '../../../lib/api';
 import { useUser } from '../../context/UserContext';
@@ -31,6 +34,19 @@ export interface InboxConversation {
   seller_id: number;
   product_id: number | null;
   viewer_role: 'buyer' | 'seller';
+  seller_order_id?: number | null;
+  suborder_details?: {
+    id: number;
+    suborder_number: string;
+    status: string;
+    status_display: string;
+    subtotal: number;
+    confirmed_delivery_fee: number;
+    fulfilment_method: string;
+    fulfilment_method_display: string;
+    delivery_location: string;
+    estimated_delivery: string;
+  } | null;
   product_details?: {
     id: number;
     title: string;
@@ -51,6 +67,7 @@ export interface InboxConversation {
     id: number;
     body: string;
     sender_id: number;
+    message_type?: string;
     is_read: boolean;
     created_at: string;
   } | null;
@@ -64,7 +81,11 @@ export interface InboxMessage {
   conversation: number;
   sender_id: number;
   sender_name: string;
-  sender_role: 'buyer' | 'seller';
+  sender_role: 'buyer' | 'seller' | 'system';
+  message_type?: 'text' | 'system' | 'delivery_proposal';
+  proposal?: number | null;
+  proposal_details?: any;
+  metadata?: any;
   body: string;
   is_read: boolean;
   created_at: string;
@@ -233,6 +254,29 @@ export const ConversationInbox: React.FC<ConversationInboxProps> = ({
       toast.error(err?.message || 'Failed to send message.');
     } finally {
       setSending(false);
+    }
+  };
+
+  const handleAcceptProposal = async (proposalId: number) => {
+    try {
+      await api.post(`/orders/delivery-agreements/${proposalId}/accept/`);
+      toast.success('Delivery proposal accepted! Fulfilment terms updated.');
+      if (selectedId) fetchThread(selectedId, true);
+      fetchConversations(true);
+    } catch (err: any) {
+      toast.error(err?.message || 'Unable to accept proposal.');
+    }
+  };
+
+  const handleDeclineProposal = async (proposalId: number) => {
+    const reason = window.prompt('Please provide a reason for declining this proposal:') || '';
+    try {
+      await api.post(`/orders/delivery-agreements/${proposalId}/reject/`, { reason });
+      toast.info('Proposal declined. Alternative terms may be proposed.');
+      if (selectedId) fetchThread(selectedId, true);
+      fetchConversations(true);
+    } catch (err: any) {
+      toast.error(err?.message || 'Unable to decline proposal.');
     }
   };
 
@@ -477,6 +521,26 @@ export const ConversationInbox: React.FC<ConversationInboxProps> = ({
               )}
             </div>
 
+            {/* Linked Suborder Banner */}
+            {selectedConversation.suborder_details && (
+              <div className="px-4 py-2.5 bg-rose-50/70 border-b border-rose-100 flex items-center justify-between text-xs">
+                <div className="flex items-center gap-2 min-w-0">
+                  <Package className="w-4 h-4 text-[#a14b58] shrink-0" />
+                  <span className="font-bold text-gray-900 truncate">
+                    Suborder #{selectedConversation.suborder_details.suborder_number}
+                  </span>
+                  <span className="text-gray-500 hidden sm:inline">• {selectedConversation.suborder_details.status_display}</span>
+                </div>
+                <Link
+                  to="/orders"
+                  className="text-[11px] font-bold text-[#a14b58] hover:underline shrink-0 flex items-center gap-1"
+                >
+                  <span>Orders Dashboard</span>
+                  <ExternalLink className="w-3 h-3" />
+                </Link>
+              </div>
+            )}
+
             {/* Campus Safety Notice */}
             <div className="px-4 py-2 bg-amber-50/80 border-b border-amber-100 text-[11px] text-amber-800 font-semibold text-center">
               Meet in public campus locations when inspecting or exchanging items.
@@ -494,6 +558,94 @@ export const ConversationInbox: React.FC<ConversationInboxProps> = ({
                 </div>
               ) : (
                 messages.map((msg) => {
+                  if (msg.message_type === 'system') {
+                    return (
+                      <div key={msg.id} className="flex justify-center my-2">
+                        <div className="bg-gray-100/90 text-gray-700 px-4 py-2 rounded-xl text-xs max-w-[88%] text-center border border-gray-200/60 shadow-2xs flex items-center gap-2">
+                          <Package className="w-4 h-4 text-[#a14b58] shrink-0" />
+                          <span className="whitespace-pre-wrap leading-relaxed">{msg.body}</span>
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  if (msg.message_type === 'delivery_proposal' || msg.proposal_details) {
+                    const prop = msg.proposal_details;
+                    const isPending = prop?.status === 'pending';
+                    const canRespond = isPending && Number(user.id) !== Number(prop?.proposed_by_id);
+
+                    return (
+                      <div key={msg.id} className="flex justify-center my-3">
+                        <div className="w-full max-w-sm bg-white rounded-2xl border-2 border-rose-200 p-4 shadow-sm space-y-3">
+                          <div className="flex items-center justify-between border-b border-gray-100 pb-2">
+                            <span className="font-bold text-gray-900 text-xs flex items-center gap-1.5">
+                              <Truck className="w-4 h-4 text-[#a14b58]" />
+                              Delivery Proposal
+                            </span>
+                            <span
+                              className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                                prop?.status === 'accepted'
+                                  ? 'bg-green-100 text-green-800'
+                                  : prop?.status === 'rejected'
+                                  ? 'bg-red-100 text-red-800'
+                                  : 'bg-amber-100 text-amber-800'
+                              }`}
+                            >
+                              {prop?.status ? prop.status.toUpperCase() : 'PENDING'}
+                            </span>
+                          </div>
+
+                          <div className="text-xs space-y-1.5 text-gray-600">
+                            <div className="flex justify-between">
+                              <span>Method:</span>
+                              <span className="font-bold text-gray-900">
+                                {prop?.fulfilment_method_display || prop?.fulfilment_method}
+                              </span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span>Fee:</span>
+                              <span className="font-bold text-[#a14b58]">
+                                GH₵{Number(prop?.proposed_fee || 0).toFixed(2)}
+                              </span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span>Location:</span>
+                              <span className="font-medium text-gray-900 text-right">{prop?.delivery_location}</span>
+                            </div>
+                            {prop?.estimated_delivery && (
+                              <div className="flex justify-between">
+                                <span>Time Window:</span>
+                                <span className="font-medium text-gray-900">{prop.estimated_delivery}</span>
+                              </div>
+                            )}
+                            {prop?.notes && (
+                              <p className="text-[11px] text-gray-500 bg-gray-50 p-2 rounded-lg mt-1 italic">
+                                &ldquo;{prop.notes}&rdquo;
+                              </p>
+                            )}
+                          </div>
+
+                          {canRespond && (
+                            <div className="flex gap-2 pt-2 border-t border-gray-100">
+                              <button
+                                onClick={() => handleAcceptProposal(prop.id)}
+                                className="flex-1 py-1.5 bg-[#a14b58] text-white rounded-xl text-xs font-bold hover:bg-[#863b48] transition-colors cursor-pointer"
+                              >
+                                Accept Proposal
+                              </button>
+                              <button
+                                onClick={() => handleDeclineProposal(prop.id)}
+                                className="px-3 py-1.5 bg-gray-100 text-gray-700 hover:bg-red-50 hover:text-red-600 rounded-xl text-xs font-bold transition-colors cursor-pointer"
+                              >
+                                Decline
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  }
+
                   const isMine = Number(msg.sender_id) === Number(user.id);
                   return (
                     <div

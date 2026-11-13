@@ -26,11 +26,17 @@ export interface CartProduct {
   condition?: string;
   stock?: number;
   stock_label?: string | null;
+  seller_id?: number | string;
+  seller_name?: string;
+  seller_university?: string;
   seller?: {
+    id?: number | string;
     name: string;
-    rating: number;
-    verified: boolean;
+    rating?: number;
+    verified?: boolean;
+    university?: string;
   };
+  delivery_settings?: any;
   description?: string;
 }
 
@@ -38,8 +44,18 @@ export interface CartItem extends CartProduct {
   quantity: number;
 }
 
+export interface SellerCartGroup {
+  sellerId: string;
+  sellerName: string;
+  sellerUniversity: string;
+  items: CartItem[];
+  subtotal: number;
+  deliverySettings?: any;
+}
+
 interface CartContextType {
   items: CartItem[];
+  sellerGroups: SellerCartGroup[];
   loading: boolean;
   addToCart: (product: CartProduct, quantity?: number) => Promise<void>;
   addItem?: (product: any, quantity?: number) => Promise<void>;
@@ -57,6 +73,11 @@ const CartContext = createContext<CartContextType | undefined>(undefined);
 
 function mapCartRow(row: any): CartItem {
   const p = row?.product || {};
+  const sellerDetails = p.seller_details || {};
+  const sName = sellerDetails.business_name || sellerDetails.name || p.seller_name || 'Verified Seller';
+  const sId = String(sellerDetails.id || p.seller_id || p.seller || 'seller-default');
+  const sUni = sellerDetails.university || p.university_name || p.university || 'Campus';
+
   return {
     id: String(p.id),
     name: p.title || p.name || 'Marketplace Item',
@@ -65,10 +86,21 @@ function mapCartRow(row: any): CartItem {
     oldPrice: p.oldPrice ? Number(p.oldPrice) : undefined,
     category: p.category || p.category_name || 'others',
     image: p.image || '',
-    university: p.university_name || p.university || '',
+    university: p.university_name || p.university || sUni,
     condition: p.condition,
     stock: p.stock !== undefined ? Number(p.stock) : undefined,
     stock_label: p.stock_label ?? null,
+    seller_id: sId,
+    seller_name: sName,
+    seller_university: sUni,
+    seller: {
+      id: sId,
+      name: sName,
+      rating: sellerDetails.rating || 5.0,
+      verified: sellerDetails.verified ?? true,
+      university: sUni,
+    },
+    delivery_settings: p.delivery_settings,
     quantity: Number(row?.quantity || 1),
   };
 }
@@ -186,6 +218,30 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const sellerGroups = React.useMemo<SellerCartGroup[]>(() => {
+    const map = new Map<string, SellerCartGroup>();
+    for (const item of items) {
+      const key = String(item.seller_id || item.seller?.id || 'unknown');
+      if (!map.has(key)) {
+        map.set(key, {
+          sellerId: key,
+          sellerName: item.seller_name || item.seller?.name || 'Verified Seller',
+          sellerUniversity: item.seller_university || item.university || 'Campus',
+          items: [],
+          subtotal: 0,
+          deliverySettings: item.delivery_settings,
+        });
+      }
+      const g = map.get(key)!;
+      g.items.push(item);
+      g.subtotal += item.price * item.quantity;
+      if (!g.deliverySettings && item.delivery_settings) {
+        g.deliverySettings = item.delivery_settings;
+      }
+    }
+    return Array.from(map.values());
+  }, [items]);
+
   const itemCount = items.reduce((sum, item) => sum + item.quantity, 0);
   const subtotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
   const deliveryFee = items.length > 0 ? 20 : 0;
@@ -195,6 +251,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     <CartContext.Provider
       value={{
         items,
+        sellerGroups,
         loading,
         addToCart,
         addItem: addToCart,

@@ -30,8 +30,8 @@ from core.permissions import IsPlatformAdmin
 from core.support_views import SupportTicketSerializer
 from marketplace.models import Product
 from marketplace.serializers import format_stock_label
-from orders.models import Order, OrderItem
-from orders.services import complete_order_and_deduct_inventory
+from orders.models import Order, OrderItem, SellerOrder, OrderIssueReport
+from orders.services import complete_order_and_deduct_inventory, complete_seller_order_and_deduct_inventory
 from payments.models import Payment
 from reviews.models import Review
 from universities.catalog import (
@@ -136,24 +136,80 @@ def _serialize_admin_product(product, request=None) -> dict:
     }
 
 
+def _serialize_admin_suborder(suborder) -> dict:
+    return {
+        "id": suborder.id,
+        "suborder_number": suborder.suborder_number,
+        "seller_id": suborder.seller_id,
+        "seller_name": (getattr(suborder.seller, "profile", None) and suborder.seller.profile.business_name) or suborder.seller.full_name or suborder.seller.email,
+        "seller_email": suborder.seller.email,
+        "seller_phone": (getattr(suborder.seller, "profile", None) and suborder.seller.profile.phone_number) or getattr(suborder.seller, "phone_number", ""),
+        "buyer_id": suborder.buyer_id,
+        "buyer_name": suborder.buyer.full_name or suborder.buyer.email,
+        "status": suborder.status,
+        "subtotal": float(suborder.subtotal or 0),
+        "advertised_delivery_fee": float(suborder.advertised_delivery_fee or 0),
+        "confirmed_delivery_fee": float(suborder.confirmed_delivery_fee or 0),
+        "total_amount": float(suborder.total_amount or 0),
+        "fulfilment_method": suborder.fulfilment_method,
+        "fulfilment_method_display": suborder.get_fulfilment_method_display(),
+        "delivery_location": suborder.delivery_location,
+        "estimated_delivery": suborder.estimated_delivery,
+        "seller_response_deadline": suborder.seller_response_deadline.isoformat() if suborder.seller_response_deadline else None,
+        "rejection_reason": suborder.rejection_reason,
+        "cancellation_reason": suborder.cancellation_reason,
+        "inventory_deducted": suborder.inventory_deducted,
+        "vendor_confirmed_at": suborder.vendor_confirmed_at.isoformat() if suborder.vendor_confirmed_at else None,
+        "created_at": suborder.created_at.isoformat() if suborder.created_at else None,
+        "items": [
+            {
+                "id": item.id,
+                "product_id": item.product_id,
+                "title": item.product_title_snapshot or (item.product.title if item.product else "Item"),
+                "quantity": item.quantity,
+                "unit_price": float(item.unit_price_snapshot or item.price_at_purchase or 0),
+                "total_price": float(item.total_price or 0),
+            }
+            for item in suborder.items.all()
+        ],
+        "issue_reports": [
+            {
+                "id": rep.id,
+                "issue_type": rep.issue_type,
+                "description": rep.description,
+                "status": rep.status,
+                "admin_notes": rep.admin_notes,
+                "created_at": rep.created_at.isoformat() if rep.created_at else None,
+            }
+            for rep in suborder.issue_reports.all()
+        ],
+    }
+
+
 def _serialize_admin_order(order) -> dict:
     items = list(order.items.all())
+    suborders = list(order.seller_orders.all())
     return {
         "id": order.id,
+        "order_number": order.order_number or f"UM-{order.id}",
         "full_name": order.full_name or (order.buyer.full_name if order.buyer else "") or "Campus Student",
         "buyer_email": order.buyer.email if order.buyer else "",
         "phone_number": order.phone_number or "",
         "university": order.university or "Unassigned",
         "hostel_room": order.hostel_room or "",
+        "total_product_amount": float(order.total_product_amount or 0),
+        "total_delivery_fee": float(order.total_delivery_fee or order.delivery_fee or 0),
         "total_amount": float(order.total_amount or 0),
         "delivery_fee": float(order.delivery_fee or 0),
-        "payment_method": order.payment_method or "paystack",
+        "payment_method": order.payment_method or "pay_on_delivery",
         "paystack_reference": order.payment_reference or "",
         "status": order.status,
+        "overall_status": order.overall_status or order.status,
         "refund_status": order.refund_status,
         "created_at": order.created_at.isoformat() if order.created_at else None,
         "updated_at": order.updated_at.isoformat() if order.updated_at else None,
         "items_count": sum(item.quantity for item in items) or len(items),
+        "seller_orders": [_serialize_admin_suborder(s) for s in suborders],
     }
 
 
@@ -805,19 +861,35 @@ class AdminOrderListView(APIView):
             "refunded_count": Order.objects.filter(refund_status="refunded").count(),
         }
 
-        qs = Order.objects.select_related("buyer").prefetch_related("items").order_by("-created_at")
+        qs = (
+            Order.objects
+            .select_related("buyer")
+            .prefetch_related(
+                "seller_orders",
+                "seller_orders__seller",
+                "seller_orders__seller__profile",
+                "seller_orders__buyer",
+                "seller_orders__items",
+                "seller_orders__issue_reports",
+                "items",
+            )
+            .order_by("-created_at")
+        )
         if status_filter and status_filter != "all":
-            qs = qs.filter(status=status_filter)
+            qs = qs.filter(Q(status=status_filter) | Q(overall_status=status_filter))
         if search:
             q_filter = (
-                Q(full_name__icontains=search)
+                Q(order_number__icontains=search)
+                | Q(full_name__icontains=search)
                 | Q(buyer__email__icontains=search)
                 | Q(payment_reference__icontains=search)
                 | Q(university__icontains=search)
+                | Q(seller_orders__suborder_number__icontains=search)
+                | Q(seller_orders__seller__email__icontains=search)
             )
             if search.isdigit():
                 q_filter |= Q(id=int(search))
-            qs = qs.filter(q_filter)
+            qs = qs.filter(q_filter).distinct()
 
         return Response({
             "stats": stats,
@@ -831,8 +903,43 @@ class AdminOrderDetailView(APIView):
     permission_classes = [IsPlatformAdmin]
 
     def patch(self, request, pk):
-        order = generics.get_object_or_404(Order.objects.select_related("buyer").prefetch_related("items"), pk=pk)
+        order = generics.get_object_or_404(
+            Order.objects
+            .select_related("buyer")
+            .prefetch_related(
+                "seller_orders",
+                "seller_orders__seller",
+                "seller_orders__seller__profile",
+                "seller_orders__buyer",
+                "seller_orders__items",
+                "seller_orders__issue_reports",
+                "items",
+            ),
+            pk=pk
+        )
         action = (request.data.get("action") or "").strip().lower()
+        suborder_id = request.data.get("suborder_id")
+
+        if suborder_id:
+            suborder = generics.get_object_or_404(SellerOrder, pk=suborder_id, master_order=order)
+            sub_status = request.data.get("suborder_status") or request.data.get("status")
+            if sub_status:
+                if sub_status == "completed":
+                    complete_seller_order_and_deduct_inventory(suborder, actor=request.user)
+                else:
+                    suborder.status = sub_status
+                    suborder.save(update_fields=["status", "updated_at"])
+                order.recalculate_derived_status_and_totals(save=True)
+            admin_note = request.data.get("admin_notes")
+            if admin_note:
+                suborder.issue_reports.filter(status__in=["open", "investigating"]).update(
+                    admin_notes=admin_note,
+                    status=request.data.get("issue_status", "resolved"),
+                    resolved_by=request.user,
+                    resolved_at=timezone.now()
+                )
+            order.refresh_from_db()
+            return Response({"order": _serialize_admin_order(order)})
 
         if action == "process_refund":
             order.refund_status = "refunded"
@@ -850,7 +957,7 @@ class AdminOrderDetailView(APIView):
 
             if next_status == "completed":
                 order.save()
-                order = complete_order_and_deduct_inventory(order)
+                order = complete_order_and_deduct_inventory(order, actor=request.user)
             else:
                 if next_status is not None:
                     order.status = next_status

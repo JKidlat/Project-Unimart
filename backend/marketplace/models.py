@@ -2,6 +2,7 @@
 Product and Category models for marketplace items.
 """
 
+from decimal import Decimal
 from django.db import models
 from django.conf import settings
 from django.db.models import Avg
@@ -132,6 +133,24 @@ class Product(models.Model):
         default=False,
         help_text="Whether the product is currently available in the shop"
     )
+
+    # Product-level delivery overrides
+    override_delivery_settings = models.BooleanField(
+        default=False,
+        help_text="When True, custom product delivery settings override seller defaults."
+    )
+    delivery_methods = models.JSONField(
+        default=list,
+        blank=True,
+        help_text="List of enabled methods, e.g. ['personal_delivery', 'collection', 'courier', 'custom']"
+    )
+    delivery_coverage = models.CharField(max_length=50, blank=True, default="")
+    delivery_fee_type = models.CharField(max_length=50, blank=True, default="")
+    base_delivery_fee = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    collection_location = models.CharField(max_length=255, blank=True, default="")
+    preparation_time = models.CharField(max_length=50, blank=True, default="")
+    delivery_instructions = models.TextField(blank=True, default="")
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -153,6 +172,70 @@ class Product(models.Model):
     def average_rating(self):
         avg_rating = self.reviews.aggregate(Avg('rating'))['rating__avg']
         return round(avg_rating, 1) if avg_rating else 5.0
+
+    def get_effective_delivery_settings(self):
+        """
+        Returns effective delivery and collection configuration for this product.
+        Falls back to seller default settings or platform defaults.
+        """
+        defaults = {
+            "offers_personal_delivery": True,
+            "offers_courier": False,
+            "offers_collection": True,
+            "offers_custom": False,
+            "delivery_coverage": "within_campus",
+            "delivery_fee_type": "fixed",
+            "base_delivery_fee": Decimal("10.00"),
+            "collection_location": "",
+            "collection_instructions": "",
+            "available_days_times": "",
+            "preparation_time": "same_day",
+            "custom_prep_time": "",
+            "delivery_notes": "",
+            "is_overridden": False,
+        }
+
+        seller = self.seller
+        seller_settings = getattr(seller, "delivery_settings", None)
+        if seller_settings:
+            defaults.update({
+                "offers_personal_delivery": seller_settings.offers_personal_delivery,
+                "offers_courier": seller_settings.offers_courier,
+                "offers_collection": seller_settings.offers_collection,
+                "offers_custom": seller_settings.offers_custom,
+                "delivery_coverage": seller_settings.delivery_coverage,
+                "delivery_fee_type": seller_settings.delivery_fee_type,
+                "base_delivery_fee": seller_settings.base_delivery_fee,
+                "collection_location": seller_settings.collection_location or "",
+                "collection_instructions": seller_settings.collection_instructions or "",
+                "available_days_times": seller_settings.available_days_times or "",
+                "preparation_time": seller_settings.preparation_time or "same_day",
+                "custom_prep_time": seller_settings.custom_prep_time or "",
+                "delivery_notes": seller_settings.delivery_notes or "",
+            })
+
+        if self.override_delivery_settings:
+            methods = self.delivery_methods or []
+            if methods:
+                defaults["offers_personal_delivery"] = "personal_delivery" in methods
+                defaults["offers_courier"] = "courier" in methods
+                defaults["offers_collection"] = "collection" in methods
+                defaults["offers_custom"] = "custom" in methods
+            if self.delivery_coverage:
+                defaults["delivery_coverage"] = self.delivery_coverage
+            if self.delivery_fee_type:
+                defaults["delivery_fee_type"] = self.delivery_fee_type
+            if self.base_delivery_fee is not None:
+                defaults["base_delivery_fee"] = self.base_delivery_fee
+            if self.collection_location:
+                defaults["collection_location"] = self.collection_location
+            if self.preparation_time:
+                defaults["preparation_time"] = self.preparation_time
+            if self.delivery_instructions:
+                defaults["delivery_notes"] = self.delivery_instructions
+            defaults["is_overridden"] = True
+
+        return defaults
 
 
 class WishlistItem(models.Model):

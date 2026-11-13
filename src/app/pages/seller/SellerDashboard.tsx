@@ -26,12 +26,16 @@ import {
   XCircle,
   Package,
   TruckIcon,
+  Truck,
   ChevronDown,
   Store,
   AlertTriangle,
   Edit3,
   RefreshCw,
   LifeBuoy,
+  MapPin,
+  Calendar,
+  Settings,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useUser } from '../../context/UserContext';
@@ -41,7 +45,7 @@ import { ImageWithFallback } from '../../components/common/ImageWithFallback';
 import { ConversationInbox } from '../../components/Chat/ConversationInbox';
 import { formatStockStatus, isLegacyBlobUrl, prepareImageForUpload } from '../../../lib/inventory';
 
-type SellerTab = 'post' | 'listings' | 'orders' | 'messages';
+type SellerTab = 'post' | 'listings' | 'orders' | 'delivery' | 'messages';
 
 const STATUS_STEPS = ['pending', 'processing', 'ready_for_pickup', 'completed'];
 
@@ -182,6 +186,7 @@ export const SellerDashboard: React.FC = () => {
     { key: 'post', label: 'Post Ad', icon: <PackagePlus className="w-4 h-4" /> },
     { key: 'listings', label: 'My Listings', icon: <ListOrdered className="w-4 h-4" /> },
     { key: 'orders', label: 'Orders', icon: <ShoppingBag className="w-4 h-4" /> },
+    { key: 'delivery', label: 'Delivery Settings', icon: <Truck className="w-4 h-4" /> },
     { key: 'messages', label: 'Messages', icon: <MessageSquare className="w-4 h-4" />, badge: unreadMessages },
   ];
 
@@ -203,7 +208,7 @@ export const SellerDashboard: React.FC = () => {
       </div>
 
       {/* Tabs */}
-      <div className="grid grid-cols-4 gap-2 mb-8 bg-gray-50 p-1.5 rounded-2xl border border-gray-100">
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 mb-8 bg-gray-50 p-1.5 rounded-2xl border border-gray-100">
         {tabs.map((tab) => (
           <button
             key={tab.key}
@@ -242,6 +247,7 @@ export const SellerDashboard: React.FC = () => {
           )}
           {activeTab === 'listings' && <MyListingsTab user={user} />}
           {activeTab === 'orders' && <SellerOrdersTab />}
+          {activeTab === 'delivery' && <SellerDeliveryTab />}
           {activeTab === 'messages' && (
             <ConversationInbox
               mode="seller"
@@ -271,6 +277,14 @@ const PostAdTab: React.FC<{ user: any; onCreated: () => void }> = ({ user, onCre
     category: '',
     description: '',
     condition: 'New',
+    override_delivery_settings: false,
+    delivery_methods: ['personal_delivery', 'buyer_collection'] as string[],
+    delivery_coverage: 'same_campus',
+    delivery_fee_type: 'fixed',
+    base_delivery_fee: '0.00',
+    collection_location: '',
+    preparation_time: 'Same Day',
+    delivery_instructions: '',
   });
 
   useEffect(() => {
@@ -325,7 +339,7 @@ const PostAdTab: React.FC<{ user: any; onCreated: () => void }> = ({ user, onCre
     setSubmitting(true);
     try {
       const uploadedUrls = await uploadSelectedPhotos(images.map((i) => i.file));
-      await api.post('/products/', {
+      const payload: Record<string, any> = {
         title: form.title.trim(),
         price: Number(form.price),
         oldPrice: form.oldPrice ? Number(form.oldPrice) : null,
@@ -335,11 +349,40 @@ const PostAdTab: React.FC<{ user: any; onCreated: () => void }> = ({ user, onCre
         description: form.description.trim(),
         image: uploadedUrls[0],
         images: uploadedUrls,
-      });
+        override_delivery_settings: form.override_delivery_settings,
+      };
+
+      if (form.override_delivery_settings) {
+        payload.delivery_methods = form.delivery_methods;
+        payload.delivery_coverage = form.delivery_coverage;
+        payload.delivery_fee_type = form.delivery_fee_type;
+        payload.base_delivery_fee = Number(form.base_delivery_fee || 0);
+        payload.collection_location = form.collection_location.trim();
+        payload.preparation_time = form.preparation_time;
+        payload.delivery_instructions = form.delivery_instructions.trim();
+      }
+
+      await api.post('/products/', payload);
       toast.success('Ad submitted for admin review! You can track it in My Listings.');
       images.forEach((img) => URL.revokeObjectURL(img.preview));
       setImages([]);
-      setForm({ title: '', price: '', oldPrice: '', stock: '1', category: '', description: '', condition: 'New' });
+      setForm({
+        title: '',
+        price: '',
+        oldPrice: '',
+        stock: '1',
+        category: '',
+        description: '',
+        condition: 'New',
+        override_delivery_settings: false,
+        delivery_methods: ['personal_delivery', 'buyer_collection'],
+        delivery_coverage: 'same_campus',
+        delivery_fee_type: 'fixed',
+        base_delivery_fee: '0.00',
+        collection_location: '',
+        preparation_time: 'Same Day',
+        delivery_instructions: '',
+      });
       onCreated();
     } catch (err: any) {
       toast.error(err?.message || 'Failed to submit ad.');
@@ -513,6 +556,121 @@ const PostAdTab: React.FC<{ user: any; onCreated: () => void }> = ({ user, onCre
         </div>
       </div>
 
+      {/* Optional Delivery Settings Override */}
+      <div className="bg-white p-6 sm:p-8 rounded-[2rem] border border-gray-100 shadow-sm space-y-5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-black text-gray-900 flex items-center gap-2">
+              <Truck className="w-5 h-5 text-[#a14b58]" />
+              Fulfilment & Delivery Preferences
+            </h2>
+            <p className="text-xs text-gray-500 mt-0.5">
+              By default, this item uses your store-wide settings from the Delivery Settings tab.
+            </p>
+          </div>
+          <label className="flex items-center gap-2 text-xs font-bold text-gray-700 cursor-pointer bg-gray-50 px-3 py-2 rounded-xl border border-gray-200">
+            <input
+              type="checkbox"
+              checked={form.override_delivery_settings}
+              onChange={(e) => setForm((p) => ({ ...p, override_delivery_settings: e.target.checked }))}
+              className="w-4 h-4 text-[#a14b58] rounded border-gray-300 focus:ring-[#a14b58]"
+            />
+            Custom settings for this item
+          </label>
+        </div>
+
+        {form.override_delivery_settings && (
+          <div className="pt-4 border-t border-gray-100 space-y-4">
+            <div>
+              <label className="text-xs font-bold text-gray-700 block mb-2">Available Handover Methods *</label>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                {[
+                  { id: 'personal_delivery', label: 'Personal Delivery (In-Person)' },
+                  { id: 'buyer_collection', label: 'Buyer Collection / Pickup' },
+                  { id: 'campus_courier', label: 'Campus Courier Service' },
+                ].map((m) => {
+                  const checked = form.delivery_methods.includes(m.id);
+                  return (
+                    <button
+                      key={m.id}
+                      type="button"
+                      onClick={() => {
+                        setForm((p) => {
+                          const exists = p.delivery_methods.includes(m.id);
+                          const updated = exists
+                            ? p.delivery_methods.filter((x) => x !== m.id)
+                            : [...p.delivery_methods, m.id];
+                          return { ...p, delivery_methods: updated.length ? updated : [m.id] };
+                        });
+                      }}
+                      className={`p-3 rounded-xl border text-xs font-bold text-left transition-all cursor-pointer ${
+                        checked
+                          ? 'border-[#a14b58] bg-[#fcf6f7] text-[#a14b58]'
+                          : 'border-gray-200 bg-gray-50 text-gray-600 hover:border-gray-300'
+                      }`}
+                    >
+                      {m.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div>
+                <label className="text-xs font-bold text-gray-700 block mb-1">Base Delivery Fee (GH₵)</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.5"
+                  value={form.base_delivery_fee}
+                  onChange={(e) => setForm((p) => ({ ...p, base_delivery_fee: e.target.value }))}
+                  placeholder="0.00"
+                  className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-[#a14b58] outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-gray-700 block mb-1">Campus Coverage</label>
+                <select
+                  value={form.delivery_coverage}
+                  onChange={(e) => setForm((p) => ({ ...p, delivery_coverage: e.target.value }))}
+                  className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-[#a14b58] outline-none"
+                >
+                  <option value="same_campus">My Campus Only</option>
+                  <option value="cross_campus">Cross-Campus Allowed</option>
+                  <option value="all">Any Campus / All Regions</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-gray-700 block mb-1">Prep / Dispatch Time</label>
+                <select
+                  value={form.preparation_time}
+                  onChange={(e) => setForm((p) => ({ ...p, preparation_time: e.target.value }))}
+                  className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-[#a14b58] outline-none"
+                >
+                  <option value="Same Day">Same Day</option>
+                  <option value="1-2 Days">1-2 Days</option>
+                  <option value="3-5 Days">3-5 Days</option>
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label className="text-xs font-bold text-gray-700 block mb-1">Collection / Pickup Location (if applicable)</label>
+              <input
+                type="text"
+                value={form.collection_location}
+                onChange={(e) => setForm((p) => ({ ...p, collection_location: e.target.value }))}
+                placeholder="e.g. Unity Hall Forecourt / Central Library"
+                className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-[#a14b58] outline-none"
+              />
+            </div>
+          </div>
+        )}
+      </div>
+
       <div className="p-4 bg-rose-50/70 rounded-2xl border border-[#f3d7db] text-xs text-gray-600 flex items-start gap-2.5">
         <Info className="w-4 h-4 text-[#a14b58] shrink-0 mt-0.5" />
         <p>
@@ -564,6 +722,14 @@ const MyListingsTab: React.FC<{ user: any }> = ({ user }) => {
     category: 'others',
     condition: 'Like New',
     description: '',
+    override_delivery_settings: false,
+    delivery_methods: ['personal_delivery', 'buyer_collection'] as string[],
+    delivery_coverage: 'same_campus',
+    delivery_fee_type: 'fixed',
+    base_delivery_fee: '0.00',
+    collection_location: '',
+    preparation_time: 'Same Day',
+    delivery_instructions: '',
   });
   const [editExistingUrls, setEditExistingUrls] = useState<string[]>([]);
   const [editNewImages, setEditNewImages] = useState<{ file: File; preview: string }[]>([]);
@@ -621,6 +787,14 @@ const MyListingsTab: React.FC<{ user: any }> = ({ user }) => {
       category: listing.category || 'others',
       condition: listing.condition || 'Like New',
       description: listing.description || '',
+      override_delivery_settings: Boolean(listing.override_delivery_settings),
+      delivery_methods: Array.isArray(listing.delivery_methods) && listing.delivery_methods.length > 0 ? listing.delivery_methods : ['personal_delivery', 'buyer_collection'],
+      delivery_coverage: listing.delivery_coverage || 'same_campus',
+      delivery_fee_type: listing.delivery_fee_type || 'fixed',
+      base_delivery_fee: String(listing.base_delivery_fee ?? '0.00'),
+      collection_location: listing.collection_location || '',
+      preparation_time: listing.preparation_time || 'Same Day',
+      delivery_instructions: listing.delivery_instructions || '',
     });
     const rawGallery = Array.isArray(listing.images) && listing.images.length > 0 ? listing.images : [listing.image];
     const validUrls = rawGallery.filter((u: any) => typeof u === 'string' && u.trim() && !isLegacyBlobUrl(u));
@@ -669,7 +843,7 @@ const MyListingsTab: React.FC<{ user: any }> = ({ user }) => {
       }
       const finalImages = [...editExistingUrls, ...uploadedNewUrls];
 
-      const updated = await api.patch(`/products/${editingListing.id}/`, {
+      const payload: Record<string, any> = {
         title: editForm.title.trim(),
         price: Number(editForm.price),
         oldPrice: editForm.oldPrice ? Number(editForm.oldPrice) : null,
@@ -679,7 +853,20 @@ const MyListingsTab: React.FC<{ user: any }> = ({ user }) => {
         description: editForm.description.trim(),
         image: finalImages[0],
         images: finalImages,
-      });
+        override_delivery_settings: editForm.override_delivery_settings,
+      };
+
+      if (editForm.override_delivery_settings) {
+        payload.delivery_methods = editForm.delivery_methods;
+        payload.delivery_coverage = editForm.delivery_coverage;
+        payload.delivery_fee_type = editForm.delivery_fee_type;
+        payload.base_delivery_fee = Number(editForm.base_delivery_fee || 0);
+        payload.collection_location = editForm.collection_location.trim();
+        payload.preparation_time = editForm.preparation_time;
+        payload.delivery_instructions = editForm.delivery_instructions.trim();
+      }
+
+      const updated = await api.patch(`/products/${editingListing.id}/`, payload);
 
       setListings((prev) => prev.map((p) => (p.id === editingListing.id ? updated : p)));
       setStockEdits((prev) => ({ ...prev, [editingListing.id]: String(updated.stock ?? stockVal) }));
@@ -1019,6 +1206,113 @@ const MyListingsTab: React.FC<{ user: any }> = ({ user }) => {
                 />
               </div>
 
+              {/* Fulfilment Settings Override */}
+              <div className="p-4 bg-gray-50 rounded-2xl border border-gray-200 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <Truck className="w-4 h-4 text-[#a14b58]" />
+                    <span className="text-xs font-bold text-gray-900">Custom Delivery Preferences</span>
+                  </div>
+                  <label className="flex items-center gap-1.5 text-[11px] font-bold text-gray-700 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={editForm.override_delivery_settings}
+                      onChange={(e) => setEditForm((p) => ({ ...p, override_delivery_settings: e.target.checked }))}
+                      className="w-3.5 h-3.5 text-[#a14b58] rounded border-gray-300"
+                    />
+                    Override default settings
+                  </label>
+                </div>
+
+                {editForm.override_delivery_settings && (
+                  <div className="pt-2 space-y-3 border-t border-gray-200 text-xs">
+                    <div>
+                      <label className="font-bold text-gray-700 block mb-1.5">Handover Methods</label>
+                      <div className="grid grid-cols-3 gap-1.5">
+                        {[
+                          { id: 'personal_delivery', label: 'Personal Delivery' },
+                          { id: 'buyer_collection', label: 'Buyer Collection' },
+                          { id: 'campus_courier', label: 'Campus Courier' },
+                        ].map((m) => {
+                          const checked = editForm.delivery_methods.includes(m.id);
+                          return (
+                            <button
+                              key={m.id}
+                              type="button"
+                              onClick={() => {
+                                setEditForm((p) => {
+                                  const exists = p.delivery_methods.includes(m.id);
+                                  const updated = exists
+                                    ? p.delivery_methods.filter((x) => x !== m.id)
+                                    : [...p.delivery_methods, m.id];
+                                  return { ...p, delivery_methods: updated.length ? updated : [m.id] };
+                                });
+                              }}
+                              className={`p-2 rounded-lg border text-[11px] font-bold text-center transition-all cursor-pointer ${
+                                checked
+                                  ? 'border-[#a14b58] bg-[#fcf6f7] text-[#a14b58]'
+                                  : 'border-gray-200 bg-white text-gray-600'
+                              }`}
+                            >
+                              {m.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-2">
+                      <div>
+                        <label className="font-bold text-gray-700 block mb-1">Base Fee (GH₵)</label>
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.5"
+                          value={editForm.base_delivery_fee}
+                          onChange={(e) => setEditForm((p) => ({ ...p, base_delivery_fee: e.target.value }))}
+                          className="w-full px-2.5 py-1.5 bg-white border border-gray-200 rounded-lg text-xs"
+                        />
+                      </div>
+                      <div>
+                        <label className="font-bold text-gray-700 block mb-1">Coverage</label>
+                        <select
+                          value={editForm.delivery_coverage}
+                          onChange={(e) => setEditForm((p) => ({ ...p, delivery_coverage: e.target.value }))}
+                          className="w-full px-2 py-1.5 bg-white border border-gray-200 rounded-lg text-xs"
+                        >
+                          <option value="same_campus">Same Campus</option>
+                          <option value="cross_campus">Cross Campus</option>
+                          <option value="all">Any Campus</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="font-bold text-gray-700 block mb-1">Prep Time</label>
+                        <select
+                          value={editForm.preparation_time}
+                          onChange={(e) => setEditForm((p) => ({ ...p, preparation_time: e.target.value }))}
+                          className="w-full px-2 py-1.5 bg-white border border-gray-200 rounded-lg text-xs"
+                        >
+                          <option value="Same Day">Same Day</option>
+                          <option value="1-2 Days">1-2 Days</option>
+                          <option value="3-5 Days">3-5 Days</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="font-bold text-gray-700 block mb-1">Pickup Location</label>
+                      <input
+                        type="text"
+                        value={editForm.collection_location}
+                        onChange={(e) => setEditForm((p) => ({ ...p, collection_location: e.target.value }))}
+                        placeholder="e.g. Unity Hall Forecourt"
+                        className="w-full px-2.5 py-1.5 bg-white border border-gray-200 rounded-lg text-xs"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+
               <div className="flex gap-3 pt-2">
                 <button
                   type="button"
@@ -1044,13 +1338,302 @@ const MyListingsTab: React.FC<{ user: any }> = ({ user }) => {
 };
 
 // ==============================================================================
-// SELLER ORDERS TAB (Real DB + Atomic Completion Inventory Deduction)
+// SELLER DELIVERY & FULFILMENT SETTINGS TAB
+// ==============================================================================
+const SellerDeliveryTab: React.FC = () => {
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [settings, setSettings] = useState({
+    offers_personal_delivery: true,
+    offers_collection: true,
+    offers_courier: false,
+    offers_custom: false,
+    delivery_coverage: 'within_campus',
+    delivery_fee_type: 'fixed',
+    base_delivery_fee: '10.00',
+    collection_location: '',
+    collection_instructions: '',
+    available_days_times: '',
+    preparation_time: 'same_day',
+    custom_prep_time: '',
+    delivery_notes: '',
+  });
+
+  useEffect(() => {
+    async function loadSettings() {
+      setLoading(true);
+      try {
+        const data = await api.get<any>('/orders/seller-delivery-settings/');
+        if (data) {
+          setSettings({
+            offers_personal_delivery: data.offers_personal_delivery ?? true,
+            offers_collection: data.offers_collection ?? true,
+            offers_courier: data.offers_courier ?? false,
+            offers_custom: data.offers_custom ?? false,
+            delivery_coverage: data.delivery_coverage || 'within_campus',
+            delivery_fee_type: data.delivery_fee_type || 'fixed',
+            base_delivery_fee: String(data.base_delivery_fee ?? '10.00'),
+            collection_location: data.collection_location || '',
+            collection_instructions: data.collection_instructions || '',
+            available_days_times: data.available_days_times || '',
+            preparation_time: data.preparation_time || 'same_day',
+            custom_prep_time: data.custom_prep_time || '',
+            delivery_notes: data.delivery_notes || '',
+          });
+        }
+      } catch (err: any) {
+        toast.error(err?.message || 'Could not load delivery settings.');
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadSettings();
+  }, []);
+
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      await api.put('/orders/seller-delivery-settings/', {
+        ...settings,
+        base_delivery_fee: Number(settings.base_delivery_fee) || 0,
+      });
+      toast.success('Store delivery & collection defaults saved successfully!');
+    } catch (err: any) {
+      toast.error(err?.message || 'Failed to save delivery settings.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="py-20 text-center">
+        <div className="w-8 h-8 border-4 border-[#a14b58] border-t-transparent rounded-full animate-spin mx-auto" />
+        <p className="text-gray-400 text-xs mt-3">Loading delivery settings...</p>
+      </div>
+    );
+  }
+
+  return (
+    <form onSubmit={handleSave} className="bg-white rounded-3xl p-6 sm:p-8 border border-gray-100 shadow-sm space-y-8">
+      <div>
+        <div className="flex items-center gap-2.5">
+          <Truck className="w-5 h-5 text-[#a14b58]" />
+          <h2 className="text-xl font-bold text-gray-900">Delivery &amp; Collection Settings</h2>
+        </div>
+        <p className="text-xs text-gray-500 mt-1">
+          Configure how you fulfill orders across your shop. These defaults apply to all your listings unless overridden.
+        </p>
+      </div>
+
+      {/* Available Fulfilment Methods */}
+      <div className="space-y-3">
+        <label className="text-xs font-bold text-gray-700 block uppercase tracking-wider">
+          Fulfilment Methods Offered
+        </label>
+        <div className="grid sm:grid-cols-2 gap-3 text-xs">
+          <label className="flex items-center gap-3 p-3.5 rounded-2xl border border-gray-200 bg-gray-50/50 cursor-pointer hover:bg-gray-50">
+            <input
+              type="checkbox"
+              checked={settings.offers_personal_delivery}
+              onChange={(e) => setSettings({ ...settings, offers_personal_delivery: e.target.checked })}
+              className="w-4 h-4 rounded text-[#a14b58] focus:ring-[#a14b58]"
+            />
+            <div>
+              <span className="font-bold text-gray-900 block">Personal Campus Delivery</span>
+              <span className="text-gray-500 text-[11px]">You or an agent deliver directly to buyer on campus</span>
+            </div>
+          </label>
+
+          <label className="flex items-center gap-3 p-3.5 rounded-2xl border border-gray-200 bg-gray-50/50 cursor-pointer hover:bg-gray-50">
+            <input
+              type="checkbox"
+              checked={settings.offers_collection}
+              onChange={(e) => setSettings({ ...settings, offers_collection: e.target.checked })}
+              className="w-4 h-4 rounded text-[#a14b58] focus:ring-[#a14b58]"
+            />
+            <div>
+              <span className="font-bold text-gray-900 block">Campus Collection / Pickup</span>
+              <span className="text-gray-500 text-[11px]">Buyer meets you at a designated campus location</span>
+            </div>
+          </label>
+
+          <label className="flex items-center gap-3 p-3.5 rounded-2xl border border-gray-200 bg-gray-50/50 cursor-pointer hover:bg-gray-50">
+            <input
+              type="checkbox"
+              checked={settings.offers_courier}
+              onChange={(e) => setSettings({ ...settings, offers_courier: e.target.checked })}
+              className="w-4 h-4 rounded text-[#a14b58] focus:ring-[#a14b58]"
+            />
+            <div>
+              <span className="font-bold text-gray-900 block">Third-Party Courier</span>
+              <span className="text-gray-500 text-[11px]">Sent via Ghana Post, VIP, or dispatch rider</span>
+            </div>
+          </label>
+
+          <label className="flex items-center gap-3 p-3.5 rounded-2xl border border-gray-200 bg-gray-50/50 cursor-pointer hover:bg-gray-50">
+            <input
+              type="checkbox"
+              checked={settings.offers_custom}
+              onChange={(e) => setSettings({ ...settings, offers_custom: e.target.checked })}
+              className="w-4 h-4 rounded text-[#a14b58] focus:ring-[#a14b58]"
+            />
+            <div>
+              <span className="font-bold text-gray-900 block">Custom Arrangement</span>
+              <span className="text-gray-500 text-[11px]">Coordinated with buyer on a case-by-case basis</span>
+            </div>
+          </label>
+        </div>
+      </div>
+
+      {/* Coverage & Fee Structure */}
+      <div className="grid sm:grid-cols-3 gap-5">
+        <div className="space-y-1.5">
+          <label className="text-xs font-bold text-gray-700 block">Delivery Reach</label>
+          <select
+            value={settings.delivery_coverage}
+            onChange={(e) => setSettings({ ...settings, delivery_coverage: e.target.value })}
+            className="w-full px-3.5 py-2.5 text-xs bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#a14b58] focus:outline-none"
+          >
+            <option value="within_campus">Within Campus / Local Campus Area</option>
+            <option value="inter_campus">Between Campuses / Tertiary Institutions</option>
+            <option value="outside_campus">Outside Campus / Surrounding Metro Area</option>
+            <option value="nationwide">Nationwide (Courier Delivery)</option>
+          </select>
+        </div>
+
+        <div className="space-y-1.5">
+          <label className="text-xs font-bold text-gray-700 block">Delivery Pricing Structure</label>
+          <select
+            value={settings.delivery_fee_type}
+            onChange={(e) => setSettings({ ...settings, delivery_fee_type: e.target.value })}
+            className="w-full px-3.5 py-2.5 text-xs bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#a14b58] focus:outline-none"
+          >
+            <option value="fixed">Fixed Rate</option>
+            <option value="free">Free Delivery</option>
+            <option value="negotiable">Negotiable / Agreed in Chat</option>
+            <option value="depends_on_location">Depends on Destination</option>
+            <option value="buyer_arranges">Buyer Arranges / Collects Only</option>
+          </select>
+        </div>
+
+        <div className="space-y-1.5">
+          <label className="text-xs font-bold text-gray-700 block">Standard Base Fee (GH₵)</label>
+          <input
+            type="number"
+            min="0"
+            step="0.5"
+            value={settings.base_delivery_fee}
+            onChange={(e) => setSettings({ ...settings, base_delivery_fee: e.target.value })}
+            disabled={settings.delivery_fee_type === 'free'}
+            className="w-full px-3.5 py-2.5 text-xs bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#a14b58] focus:outline-none disabled:opacity-50"
+          />
+        </div>
+      </div>
+
+      {/* Campus Pickup Details */}
+      <div className="grid sm:grid-cols-2 gap-5 pt-2 border-t border-gray-100">
+        <div className="space-y-1.5">
+          <label className="text-xs font-bold text-gray-700 block">Designated Campus Meeting Point</label>
+          <input
+            type="text"
+            placeholder="e.g. Commercial Area / Main Library Entrance"
+            value={settings.collection_location}
+            onChange={(e) => setSettings({ ...settings, collection_location: e.target.value })}
+            className="w-full px-3.5 py-2.5 text-xs bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#a14b58] focus:outline-none"
+          />
+        </div>
+
+        <div className="space-y-1.5">
+          <label className="text-xs font-bold text-gray-700 block">Available Pickup Days &amp; Hours</label>
+          <input
+            type="text"
+            placeholder="e.g. Mon-Fri 2:00 PM - 6:00 PM"
+            value={settings.available_days_times}
+            onChange={(e) => setSettings({ ...settings, available_days_times: e.target.value })}
+            className="w-full px-3.5 py-2.5 text-xs bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#a14b58] focus:outline-none"
+          />
+        </div>
+
+        <div className="sm:col-span-2 space-y-1.5">
+          <label className="text-xs font-bold text-gray-700 block">Pickup &amp; Handover Instructions</label>
+          <input
+            type="text"
+            placeholder="e.g. Call or message when arriving; bring exact cash or pay MoMo on spot"
+            value={settings.collection_instructions}
+            onChange={(e) => setSettings({ ...settings, collection_instructions: e.target.value })}
+            className="w-full px-3.5 py-2.5 text-xs bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#a14b58] focus:outline-none"
+          />
+        </div>
+      </div>
+
+      {/* Preparation Time & Terms */}
+      <div className="grid sm:grid-cols-2 gap-5 pt-2 border-t border-gray-100">
+        <div className="space-y-1.5">
+          <label className="text-xs font-bold text-gray-700 block">Standard Preparation Lead Time</label>
+          <select
+            value={settings.preparation_time}
+            onChange={(e) => setSettings({ ...settings, preparation_time: e.target.value })}
+            className="w-full px-3.5 py-2.5 text-xs bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#a14b58] focus:outline-none"
+          >
+            <option value="same_day">Same Day (Within 12 hours)</option>
+            <option value="1_2_days">1 - 2 Business Days</option>
+            <option value="3_5_days">3 - 5 Business Days</option>
+            <option value="custom">Custom / On Demand</option>
+          </select>
+        </div>
+
+        <div className="space-y-1.5">
+          <label className="text-xs font-bold text-gray-700 block">Additional Notes or Terms</label>
+          <input
+            type="text"
+            placeholder="e.g. No delivery during lecture hours (9am - 12pm)"
+            value={settings.delivery_notes}
+            onChange={(e) => setSettings({ ...settings, delivery_notes: e.target.value })}
+            className="w-full px-3.5 py-2.5 text-xs bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#a14b58] focus:outline-none"
+          />
+        </div>
+      </div>
+
+      <div className="pt-4 border-t border-gray-100 flex justify-end">
+        <button
+          type="submit"
+          disabled={saving}
+          className="px-6 py-3 bg-[#a14b58] hover:bg-[#863b48] text-white rounded-2xl font-bold text-xs sm:text-sm transition-all shadow-md shadow-[#a14b5833] disabled:opacity-50 cursor-pointer"
+        >
+          {saving ? 'Saving Settings...' : 'Save Delivery Settings'}
+        </button>
+      </div>
+    </form>
+  );
+};
+
+// ==============================================================================
+// SELLER ORDERS TAB (Multi-Vendor Suborders + 12h Deadline + Fulfilment Actions)
 // ==============================================================================
 const SellerOrdersTab: React.FC = () => {
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [updatingId, setUpdatingId] = useState<number | null>(null);
+  const [filterStatus, setFilterStatus] = useState<string>('all');
+  const [actionLoadingId, setActionLoadingId] = useState<number | null>(null);
+
+  // Modals state
+  const [rejectingSuborder, setRejectingSuborder] = useState<any | null>(null);
+  const [rejectReason, setRejectReason] = useState('');
+
+  const [cancellingSuborder, setCancellingSuborder] = useState<any | null>(null);
+  const [cancelReason, setCancelReason] = useState('');
+
+  const [proposingSuborder, setProposingSuborder] = useState<any | null>(null);
+  const [proposalData, setProposalData] = useState({
+    fulfilment_method: 'personal_delivery',
+    proposed_fee: '10.00',
+    delivery_location: '',
+    estimated_delivery: '',
+    notes: '',
+  });
 
   const loadOrders = useCallback(async (silent = false) => {
     if (!silent) {
@@ -1058,7 +1641,7 @@ const SellerOrdersTab: React.FC = () => {
       setError(null);
     }
     try {
-      const data = await api.get('/orders/?role=seller');
+      const data = await api.get<any>('/orders/seller-orders/');
       const list = Array.isArray(data) ? data : data?.results || [];
       setOrders(list);
       setError(null);
@@ -1077,34 +1660,140 @@ const SellerOrdersTab: React.FC = () => {
     return () => clearInterval(interval);
   }, [loadOrders]);
 
-  const updateStatus = async (orderId: number, newStatus: string) => {
-    setUpdatingId(orderId);
+  // Handle Accept Order (within 12h deadline)
+  const handleAcceptOrder = async (suborderId: number) => {
+    setActionLoadingId(suborderId);
     try {
-      const updated = await api.patch(`/orders/${orderId}/`, { status: newStatus });
-      setOrders((prev) => prev.map((o) => (o.id === orderId ? { ...o, ...updated } : o)));
-      if (newStatus === 'completed') {
-        toast.success(`Order #${orderId} completed and inventory updated!`);
-      } else {
-        toast.success(`Order status updated to "${STATUS_LABELS[newStatus] || newStatus}".`);
-      }
+      await api.post(`/orders/seller-orders/${suborderId}/accept/`);
+      toast.success('Order accepted! You can now prepare items and agree on delivery.');
+      loadOrders(true);
     } catch (err: any) {
-      toast.error(err?.message || 'Failed to update order status.');
+      toast.error(err?.message || 'Failed to accept order.');
     } finally {
-      setUpdatingId(null);
+      setActionLoadingId(null);
     }
   };
+
+  // Handle Reject Order submission
+  const submitRejectOrder = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!rejectingSuborder || !rejectReason.trim()) {
+      toast.error('Please provide a reason for declining.');
+      return;
+    }
+    setActionLoadingId(rejectingSuborder.id);
+    try {
+      await api.post(`/orders/seller-orders/${rejectingSuborder.id}/reject/`, {
+        reason: rejectReason.trim(),
+      });
+      toast.info(`Suborder #${rejectingSuborder.suborder_number} declined.`);
+      setRejectingSuborder(null);
+      setRejectReason('');
+      loadOrders(true);
+    } catch (err: any) {
+      toast.error(err?.message || 'Failed to decline order.');
+    } finally {
+      setActionLoadingId(null);
+    }
+  };
+
+  // Handle Cancel Order submission
+  const submitCancelOrder = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!cancellingSuborder || !cancelReason.trim()) {
+      toast.error('Please provide a cancellation reason.');
+      return;
+    }
+    setActionLoadingId(cancellingSuborder.id);
+    try {
+      await api.post(`/orders/seller-orders/${cancellingSuborder.id}/cancel/`, {
+        reason: cancelReason.trim(),
+      });
+      toast.info(`Suborder #${cancellingSuborder.suborder_number} cancelled.`);
+      setCancellingSuborder(null);
+      setCancelReason('');
+      loadOrders(true);
+    } catch (err: any) {
+      toast.error(err?.message || 'Failed to cancel order.');
+    } finally {
+      setActionLoadingId(null);
+    }
+  };
+
+  // Handle Propose Delivery Terms submission
+  const submitDeliveryProposal = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!proposingSuborder || !proposalData.delivery_location.trim()) {
+      toast.error('Please specify the delivery / meeting location.');
+      return;
+    }
+    setActionLoadingId(proposingSuborder.id);
+    try {
+      await api.post(`/orders/seller-orders/${proposingSuborder.id}/propose-delivery/`, {
+        fulfilment_method: proposalData.fulfilment_method,
+        proposed_fee: Number(proposalData.proposed_fee) || 0,
+        delivery_location: proposalData.delivery_location.trim(),
+        estimated_delivery: proposalData.estimated_delivery.trim(),
+        notes: proposalData.notes.trim(),
+      });
+      toast.success('Delivery proposal sent to buyer! Terms posted to order chat.');
+      setProposingSuborder(null);
+      loadOrders(true);
+    } catch (err: any) {
+      toast.error(err?.message || 'Failed to propose delivery terms.');
+    } finally {
+      setActionLoadingId(null);
+    }
+  };
+
+  // Handle status advance (e.g. preparing, ready_for_collection, dispatched, completed)
+  const handleUpdateStatus = async (suborderId: number, nextStatus: string) => {
+    setActionLoadingId(suborderId);
+    try {
+      await api.patch(`/orders/seller-orders/${suborderId}/update-status/`, { status: nextStatus });
+      toast.success(`Suborder status updated to "${nextStatus.replace(/_/g, ' ')}"!`);
+      loadOrders(true);
+    } catch (err: any) {
+      toast.error(err?.message || 'Failed to update suborder status.');
+    } finally {
+      setActionLoadingId(null);
+    }
+  };
+
+  const calculateHoursRemaining = (deadlineStr?: string | null) => {
+    if (!deadlineStr) return null;
+    const deadline = new Date(deadlineStr).getTime();
+    const diff = deadline - Date.now();
+    if (diff <= 0) return 'Deadline expired';
+    const hours = Math.floor(diff / (1000 * 60 * 60));
+    const mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+    return `${hours}h ${mins}m remaining`;
+  };
+
+  // Filter orders
+  const filteredOrders = orders.filter((sub) => {
+    if (filterStatus === 'all') return true;
+    if (filterStatus === 'pending') return sub.status === 'pending_response';
+    if (filterStatus === 'active') {
+      return ['accepted', 'awaiting_delivery_agreement', 'preparing', 'ready_for_collection', 'dispatched', 'delivered'].includes(sub.status);
+    }
+    if (filterStatus === 'completed') return sub.status === 'completed';
+    if (filterStatus === 'cancelled') return ['cancelled', 'rejected', 'issue_reported'].includes(sub.status);
+    return true;
+  });
 
   if (loading) {
     return (
       <div className="py-20 text-center">
         <div className="w-8 h-8 border-4 border-[#a14b58] border-t-transparent rounded-full animate-spin mx-auto" />
+        <p className="text-gray-400 text-xs mt-3">Loading your seller orders...</p>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="bg-white rounded-3xl p-10 text-center border border-red-100">
+      <div className="bg-white rounded-3xl p-10 text-center border border-red-100 shadow-sm">
         <p className="font-bold text-red-600 mb-2">Unable to load orders</p>
         <p className="text-sm text-gray-500 mb-4">{error}</p>
         <button
@@ -1117,124 +1806,489 @@ const SellerOrdersTab: React.FC = () => {
     );
   }
 
-  if (orders.length === 0) {
-    return (
-      <div className="bg-white rounded-3xl p-10 text-center border border-gray-100">
-        <ShoppingBag className="w-12 h-12 text-gray-200 mx-auto mb-4" />
-        <h3 className="font-bold text-gray-900 mb-2">No orders yet</h3>
-        <p className="text-gray-400 text-sm">Orders from buyers will appear here when they come in.</p>
-      </div>
-    );
-  }
-
   return (
-    <div className="space-y-5">
-      {orders.map((order) => {
-        const normalized = normalizeOrderStatus(order.status);
-        const nextStatus = STATUS_STEPS[STATUS_STEPS.indexOf(normalized) + 1];
-        const totalAmt = Number(order.total_amount || 0);
+    <div className="space-y-6">
+      {/* Suborders Filter Bar */}
+      <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-4 rounded-2xl border border-gray-100 shadow-xs">
+        <div className="flex flex-wrap items-center gap-1.5 text-xs font-bold">
+          {[
+            { key: 'all', label: `All (${orders.length})` },
+            { key: 'pending', label: `Pending Response (${orders.filter((o) => o.status === 'pending_response').length})` },
+            { key: 'active', label: 'Preparing / Active' },
+            { key: 'completed', label: 'Completed' },
+            { key: 'cancelled', label: 'Cancelled / Declined' },
+          ].map((tab) => (
+            <button
+              key={tab.key}
+              onClick={() => setFilterStatus(tab.key)}
+              className={`px-3 py-1.5 rounded-xl transition-all cursor-pointer ${
+                filterStatus === tab.key
+                  ? 'bg-[#a14b58] text-white shadow-xs'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+        <button
+          onClick={() => loadOrders(false)}
+          className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600 cursor-pointer"
+          title="Refresh orders"
+        >
+          <RefreshCw className="w-4 h-4" />
+        </button>
+      </div>
 
-        return (
-          <div key={order.id} className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
-            <div className="flex items-start justify-between gap-4 flex-wrap mb-4">
-              <div>
-                <p className="font-black text-gray-900">Order #{order.id}</p>
-                <p className="text-xs text-gray-400 mt-0.5">
-                  {new Date(order.created_at || Date.now()).toLocaleString()}
-                </p>
-              </div>
-              <div className="flex items-center gap-2">
-                <span
-                  className={`flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full border ${
-                    order.status === 'completed'
-                      ? 'bg-green-50 text-green-700 border-green-100'
-                      : order.status === 'cancelled'
-                      ? 'bg-red-50 text-red-700 border-red-100'
-                      : 'bg-amber-50 text-amber-700 border-amber-100'
-                  }`}
-                >
-                  {STATUS_ICONS[order.status] || STATUS_ICONS.pending}
-                  {STATUS_LABELS[order.status] || order.status}
-                </span>
-              </div>
-            </div>
+      {filteredOrders.length === 0 ? (
+        <div className="bg-white rounded-3xl p-12 text-center border border-gray-100 shadow-sm">
+          <ShoppingBag className="w-12 h-12 text-gray-200 mx-auto mb-3" />
+          <h3 className="font-bold text-gray-900 mb-1">No orders found</h3>
+          <p className="text-gray-400 text-xs">Orders matching this filter will appear here.</p>
+        </div>
+      ) : (
+        filteredOrders.map((sub) => {
+          const deadlineText =
+            sub.status === 'pending_response'
+              ? calculateHoursRemaining(sub.seller_response_deadline)
+              : null;
+          const statusConfig = SUBORDER_STATUS_MAP[sub.status] || {
+            label: sub.status,
+            color: 'bg-gray-100 text-gray-700 border-gray-200',
+          };
 
-            {/* Items */}
-            <div className="space-y-2 pb-4 border-b border-gray-100 mb-4">
-              {(order.items || []).map((item: any, i: number) => {
-                const lineTotal = Number(
-                  item.total_price ?? Number(item.price_at_purchase || item.price || 0) * Number(item.quantity || 1)
-                );
-                return (
-                  <div key={i} className="flex justify-between text-sm">
-                    <span className="text-gray-700">
-                      {item.quantity}× {item.product_title || item.name || `Product #${item.product_id}`}
+          return (
+            <div
+              key={sub.id}
+              className="bg-white rounded-3xl p-6 border border-gray-200 shadow-sm space-y-4 hover:border-gray-300 transition-colors"
+            >
+              {/* Header */}
+              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 pb-4">
+                <div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-black text-gray-900 text-base">
+                      Suborder #{sub.suborder_number}
                     </span>
-                    <span className="font-bold text-gray-900">GH₵{lineTotal.toLocaleString()}</span>
+                    <span className="text-xs text-gray-400 font-mono">
+                      (Master: #{sub.master_order_number || sub.master_order_id})
+                    </span>
+                    <span
+                      className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full border ${statusConfig.color}`}
+                    >
+                      {statusConfig.label}
+                    </span>
                   </div>
-                );
-              })}
-            </div>
-
-            <div className="flex flex-wrap items-center justify-between gap-4 pt-2 border-t border-gray-100">
-              <div>
-                <p className="text-xs text-gray-400">Buyer &amp; Drop-off</p>
-                <p className="font-bold text-gray-700 text-sm">
-                  {order.buyer_name || order.full_name || 'Student Buyer'}
-                  {order.phone_number ? ` • ${order.phone_number}` : ''}
-                </p>
-                {order.hostel_room && (
-                  <p className="text-xs text-gray-500">
-                    {order.university} • {order.hostel_room}
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    Received on {new Date(sub.created_at).toLocaleString()}
                   </p>
-                )}
-              </div>
-              <div className="flex items-center gap-4">
-                <Link
-                  to={`/contact?orderId=${order.id}&category=Order+Problem`}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-gray-200 text-gray-600 hover:text-[#a14b58] hover:border-[#a14b58] text-xs font-semibold transition-colors bg-gray-50/70 hover:bg-rose-50/50"
-                >
-                  <LifeBuoy className="w-3.5 h-3.5 text-[#a14b58]" />
-                  <span>Order Support</span>
-                </Link>
+                </div>
+
                 <div className="text-right">
-                  <p className="text-xs text-gray-400">Total</p>
-                  <p className="font-black text-[#a14b58]">GH₵{totalAmt.toLocaleString()}</p>
+                  <span className="text-xs text-gray-400 block">Suborder Total</span>
+                  <span className="text-xl font-black text-[#a14b58]">
+                    GH₵{Number(sub.total_amount || 0).toFixed(2)}
+                  </span>
                 </div>
               </div>
-            </div>
 
-            {/* Fulfillment Actions */}
-            {nextStatus && order.status !== 'cancelled' && order.status !== 'completed' && (
-              <div className="mt-4 pt-4 border-t border-gray-100 flex flex-col sm:flex-row gap-2.5">
-                <button
-                  onClick={() => updateStatus(order.id, nextStatus)}
-                  disabled={updatingId === order.id}
-                  className="flex-1 py-3 bg-[#a14b58] text-white rounded-xl font-bold text-sm hover:bg-[#863b48] transition-all disabled:opacity-60 flex items-center justify-center gap-2 cursor-pointer"
-                >
-                  {updatingId === order.id ? (
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  ) : (
+              {/* 12-Hour Deadline Timer */}
+              {deadlineText && (
+                <div className="flex items-center justify-between gap-2 p-3 rounded-2xl bg-amber-50 border border-amber-200 text-xs text-amber-900">
+                  <div className="flex items-center gap-2">
+                    <Clock className="w-4 h-4 text-amber-600 shrink-0" />
+                    <span>Response Deadline: </span>
+                    <span className="font-bold">{deadlineText}</span>
+                  </div>
+                  <span className="text-[11px] text-amber-700">Please accept or decline within 12h</span>
+                </div>
+              )}
+
+              {/* Items List */}
+              <div className="space-y-2 py-1">
+                {(sub.items || []).map((item: any) => (
+                  <div
+                    key={item.id}
+                    className="flex items-center justify-between text-xs sm:text-sm gap-3"
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      {item.product_image ? (
+                        <div className="w-10 h-10 rounded-xl overflow-hidden bg-gray-50 border border-gray-100 shrink-0">
+                          <ImageWithFallback
+                            src={item.product_image}
+                            alt={item.product_title}
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                      ) : (
+                        <div className="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center font-bold text-gray-500 text-xs shrink-0">
+                          {item.quantity}×
+                        </div>
+                      )}
+                      <div>
+                        <p className="font-bold text-gray-900 truncate">
+                          {item.quantity}× {item.product_title}
+                        </p>
+                        <p className="text-[11px] text-gray-400">
+                          Unit: GH₵{Number(item.price_at_purchase || 0).toFixed(2)}
+                        </p>
+                      </div>
+                    </div>
+                    <span className="font-bold text-gray-900 shrink-0">
+                      GH₵{Number(item.total_price || 0).toFixed(2)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+
+              {/* Buyer & Handover Details */}
+              <div className="bg-gray-50/80 p-3.5 rounded-2xl border border-gray-100 grid sm:grid-cols-3 gap-3 text-xs text-gray-700">
+                <div>
+                  <span className="text-gray-400 block text-[10px] uppercase font-bold">Buyer</span>
+                  <span className="font-bold text-gray-900 block truncate">{sub.buyer_name}</span>
+                  <span className="text-gray-500 text-[11px] block">{sub.buyer_phone || 'Phone upon chat'}</span>
+                </div>
+                <div>
+                  <span className="text-gray-400 block text-[10px] uppercase font-bold">Campus / Hall</span>
+                  <span className="font-medium text-gray-900 block truncate">{sub.buyer_university}</span>
+                  <span className="text-gray-500 text-[11px] block truncate">{sub.hostel_room || 'Room not specified'}</span>
+                </div>
+                <div>
+                  <span className="text-gray-400 block text-[10px] uppercase font-bold">Fulfilment</span>
+                  <span className="font-bold text-gray-900 block capitalize">
+                    {String(sub.fulfilment_method || 'personal_delivery').replace(/_/g, ' ')}
+                  </span>
+                  <span className="text-gray-500 text-[11px] block">
+                    Fee: GH₵{Number(sub.confirmed_delivery_fee || sub.advertised_delivery_fee || 0).toFixed(2)}
+                  </span>
+                </div>
+              </div>
+
+              {/* Latest Agreement Banner if pending or active */}
+              {sub.latest_agreement && (
+                <div className="p-3 rounded-xl bg-blue-50/60 border border-blue-100 text-xs text-blue-900 flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-1.5">
+                    <Truck className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                    <span>
+                      Agreement: GH₵{Number(sub.latest_agreement.proposed_fee).toFixed(2)} at {sub.latest_agreement.delivery_location}
+                    </span>
+                  </div>
+                  <span className="font-bold uppercase text-[10px] px-2 py-0.5 rounded-full bg-white border border-blue-200">
+                    {sub.latest_agreement.status}
+                  </span>
+                </div>
+              )}
+
+              {/* Status Stepper & Action Controls */}
+              <div className="pt-2 border-t border-gray-100 flex flex-wrap items-center justify-between gap-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Link
+                    to="/messages"
+                    className="inline-flex items-center gap-1.5 px-3 py-2 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-xl text-xs font-bold text-gray-700 transition-colors cursor-pointer"
+                  >
+                    <MessageSquare className="w-3.5 h-3.5 text-[#a14b58]" />
+                    <span>Chat with Buyer</span>
+                  </Link>
+
+                  {/* Accept / Reject when pending response */}
+                  {sub.status === 'pending_response' && (
                     <>
-                      Mark as &ldquo;{STATUS_LABELS[nextStatus]}&rdquo;
-                      <ChevronDown className="w-4 h-4 -rotate-90" />
+                      <button
+                        disabled={actionLoadingId === sub.id}
+                        onClick={() => handleAcceptOrder(sub.id)}
+                        className="px-4 py-2 bg-[#a14b58] hover:bg-[#863b48] text-white rounded-xl text-xs font-bold transition-colors cursor-pointer disabled:opacity-50"
+                      >
+                        {actionLoadingId === sub.id ? 'Accepting...' : 'Accept Order'}
+                      </button>
+                      <button
+                        onClick={() => setRejectingSuborder(sub)}
+                        className="px-3 py-2 bg-gray-100 hover:bg-red-50 hover:text-red-600 text-gray-600 rounded-xl text-xs font-bold transition-colors cursor-pointer"
+                      >
+                        Decline
+                      </button>
                     </>
                   )}
-                </button>
-                {(order.status === 'pending' || order.status === 'processing') && (
+
+                  {/* Delivery proposal & status advancement when active */}
+                  {(sub.status === 'accepted' || sub.status === 'awaiting_delivery_agreement' || sub.status === 'preparing') && (
+                    <>
+                      <button
+                        onClick={() => {
+                          setProposingSuborder(sub);
+                          setProposalData({
+                            fulfilment_method: sub.fulfilment_method || 'personal_delivery',
+                            proposed_fee: String(sub.confirmed_delivery_fee || sub.advertised_delivery_fee || '10.00'),
+                            delivery_location: sub.delivery_location || sub.hostel_room || '',
+                            estimated_delivery: sub.estimated_delivery || '',
+                            notes: '',
+                          });
+                        }}
+                        className="px-3.5 py-2 bg-rose-50 hover:bg-rose-100 text-[#a14b58] border border-rose-200 rounded-xl text-xs font-bold transition-colors cursor-pointer"
+                      >
+                        Propose / Agree Delivery
+                      </button>
+
+                      {sub.status !== 'preparing' && (
+                        <button
+                          disabled={actionLoadingId === sub.id}
+                          onClick={() => handleUpdateStatus(sub.id, 'preparing')}
+                          className="px-3.5 py-2 bg-gray-900 hover:bg-black text-white rounded-xl text-xs font-bold transition-colors cursor-pointer disabled:opacity-50"
+                        >
+                          Start Preparing
+                        </button>
+                      )}
+
+                      {sub.status === 'preparing' && sub.fulfilment_method === 'collection' && (
+                        <button
+                          disabled={actionLoadingId === sub.id}
+                          onClick={() => handleUpdateStatus(sub.id, 'ready_for_collection')}
+                          className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-colors cursor-pointer disabled:opacity-50"
+                        >
+                          Mark Ready for Pickup
+                        </button>
+                      )}
+
+                      {sub.status === 'preparing' && sub.fulfilment_method !== 'collection' && (
+                        <button
+                          disabled={actionLoadingId === sub.id}
+                          onClick={() => handleUpdateStatus(sub.id, 'dispatched')}
+                          className="px-3.5 py-2 bg-cyan-600 hover:bg-cyan-700 text-white rounded-xl text-xs font-bold transition-colors cursor-pointer disabled:opacity-50"
+                        >
+                          Mark as Dispatched
+                        </button>
+                      )}
+                    </>
+                  )}
+
+                  {/* Complete order when ready or dispatched */}
+                  {(sub.status === 'ready_for_collection' || sub.status === 'dispatched' || sub.status === 'delivered') && (
+                    <button
+                      disabled={actionLoadingId === sub.id}
+                      onClick={() => handleUpdateStatus(sub.id, 'completed')}
+                      className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-xl text-xs font-bold transition-colors cursor-pointer disabled:opacity-50"
+                    >
+                      {actionLoadingId === sub.id ? 'Completing...' : 'Mark as Completed'}
+                    </button>
+                  )}
+                </div>
+
+                {/* Cancel suborder button */}
+                {sub.status !== 'completed' && sub.status !== 'cancelled' && sub.status !== 'rejected' && (
                   <button
-                    onClick={() => updateStatus(order.id, 'cancelled')}
-                    disabled={updatingId === order.id}
-                    className="px-4 py-3 bg-gray-100 hover:bg-red-50 hover:text-red-600 text-gray-600 rounded-xl font-bold text-sm transition-colors cursor-pointer disabled:opacity-60"
+                    onClick={() => setCancellingSuborder(sub)}
+                    className="text-xs text-gray-400 hover:text-red-600 font-semibold cursor-pointer"
                   >
-                    Cancel Order
+                    Cancel Suborder
                   </button>
                 )}
               </div>
-            )}
+            </div>
+          );
+        })
+      )}
+
+      {/* Propose Delivery Terms Modal */}
+      {proposingSuborder && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+              <h3 className="font-black text-gray-900 text-base">
+                Propose Delivery for #{proposingSuborder.suborder_number}
+              </h3>
+              <button
+                onClick={() => setProposingSuborder(null)}
+                className="p-1 rounded-lg text-gray-400 hover:text-gray-600 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={submitDeliveryProposal} className="space-y-3.5">
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-gray-700 block">Fulfilment Method</label>
+                <select
+                  value={proposalData.fulfilment_method}
+                  onChange={(e) => setProposalData({ ...proposalData, fulfilment_method: e.target.value })}
+                  className="w-full px-3 py-2 text-xs border border-gray-200 rounded-xl bg-white focus:ring-2 focus:ring-[#a14b58] focus:outline-none"
+                >
+                  <option value="personal_delivery">Personal Campus Delivery</option>
+                  <option value="collection">Buyer Pickup / Meetup</option>
+                  <option value="courier">Third-Party Courier</option>
+                  <option value="custom">Custom Arrangement</option>
+                </select>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-gray-700 block">Delivery Fee (GH₵)</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.5"
+                  required
+                  value={proposalData.proposed_fee}
+                  onChange={(e) => setProposalData({ ...proposalData, proposed_fee: e.target.value })}
+                  className="w-full px-3 py-2 text-xs border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#a14b58] focus:outline-none"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-gray-700 block">Delivery / Handover Location</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Brunei Hall Porter's Lodge or Faculty Square"
+                  value={proposalData.delivery_location}
+                  onChange={(e) => setProposalData({ ...proposalData, delivery_location: e.target.value })}
+                  className="w-full px-3 py-2 text-xs border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#a14b58] focus:outline-none"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-gray-700 block">Estimated Time Window</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Tomorrow between 2:00 PM and 4:00 PM"
+                  value={proposalData.estimated_delivery}
+                  onChange={(e) => setProposalData({ ...proposalData, estimated_delivery: e.target.value })}
+                  className="w-full px-3 py-2 text-xs border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#a14b58] focus:outline-none"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-gray-700 block">Notes for Buyer</label>
+                <textarea
+                  rows={2}
+                  placeholder="e.g. Call me 10 mins before you arrive"
+                  value={proposalData.notes}
+                  onChange={(e) => setProposalData({ ...proposalData, notes: e.target.value })}
+                  className="w-full px-3 py-2 text-xs border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#a14b58] focus:outline-none"
+                />
+              </div>
+
+              <div className="flex gap-2 justify-end pt-2 border-t border-gray-100">
+                <button
+                  type="button"
+                  onClick={() => setProposingSuborder(null)}
+                  className="px-4 py-2 text-xs font-bold text-gray-600 hover:bg-gray-100 rounded-xl cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={actionLoadingId !== null}
+                  className="px-4 py-2 bg-[#a14b58] hover:bg-[#863b48] text-white rounded-xl text-xs font-bold transition-colors cursor-pointer disabled:opacity-50"
+                >
+                  Send Proposal
+                </button>
+              </div>
+            </form>
           </div>
-        );
-      })}
+        </div>
+      )}
+
+      {/* Reject Order Modal */}
+      {rejectingSuborder && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+              <h3 className="font-black text-gray-900 text-base">
+                Decline Suborder #{rejectingSuborder.suborder_number}
+              </h3>
+              <button
+                onClick={() => setRejectingSuborder(null)}
+                className="p-1 rounded-lg text-gray-400 hover:text-gray-600 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <p className="text-xs text-gray-500">
+              Provide a clear reason for declining this order so the student buyer understands.
+            </p>
+
+            <form onSubmit={submitRejectOrder} className="space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-gray-700 block">Decline Reason</label>
+                <textarea
+                  rows={3}
+                  required
+                  placeholder="e.g. Item already sold offline, temporarily out of stock, away from campus"
+                  value={rejectReason}
+                  onChange={(e) => setRejectReason(e.target.value)}
+                  className="w-full px-3 py-2 text-xs border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#a14b58] focus:outline-none"
+                />
+              </div>
+
+              <div className="flex gap-2 justify-end pt-2">
+                <button
+                  type="button"
+                  onClick={() => setRejectingSuborder(null)}
+                  className="px-4 py-2 text-xs font-bold text-gray-600 hover:bg-gray-100 rounded-xl cursor-pointer"
+                >
+                  Keep Order
+                </button>
+                <button
+                  type="submit"
+                  disabled={actionLoadingId !== null}
+                  className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold transition-colors cursor-pointer disabled:opacity-50"
+                >
+                  Decline Order
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Cancel Order Modal */}
+      {cancellingSuborder && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+              <h3 className="font-black text-gray-900 text-base">
+                Cancel Suborder #{cancellingSuborder.suborder_number}
+              </h3>
+              <button
+                onClick={() => setCancellingSuborder(null)}
+                className="p-1 rounded-lg text-gray-400 hover:text-gray-600 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={submitCancelOrder} className="space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-gray-700 block">Reason for Cancellation</label>
+                <textarea
+                  rows={3}
+                  required
+                  placeholder="e.g. Unable to fulfill delivery at this time"
+                  value={cancelReason}
+                  onChange={(e) => setCancelReason(e.target.value)}
+                  className="w-full px-3 py-2 text-xs border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#a14b58] focus:outline-none"
+                />
+              </div>
+
+              <div className="flex gap-2 justify-end pt-2">
+                <button
+                  type="button"
+                  onClick={() => setCancellingSuborder(null)}
+                  className="px-4 py-2 text-xs font-bold text-gray-600 hover:bg-gray-100 rounded-xl cursor-pointer"
+                >
+                  Keep Order
+                </button>
+                <button
+                  type="submit"
+                  disabled={actionLoadingId !== null}
+                  className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold transition-colors cursor-pointer disabled:opacity-50"
+                >
+                  Confirm Cancellation
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
+

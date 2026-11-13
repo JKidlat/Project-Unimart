@@ -57,6 +57,15 @@ class ProductSerializer(serializers.ModelSerializer):
         child=serializers.CharField(max_length=1000),
         required=False,
     )
+    override_delivery_settings = serializers.BooleanField(required=False, default=False)
+    delivery_methods = serializers.ListField(child=serializers.CharField(), required=False, default=list)
+    delivery_coverage = serializers.CharField(required=False, allow_blank=True, default='')
+    delivery_fee_type = serializers.CharField(required=False, allow_blank=True, default='')
+    base_delivery_fee = serializers.DecimalField(max_digits=10, decimal_places=2, required=False, allow_null=True)
+    collection_location = serializers.CharField(required=False, allow_blank=True, default='')
+    preparation_time = serializers.CharField(required=False, allow_blank=True, default='')
+    delivery_instructions = serializers.CharField(required=False, allow_blank=True, default='')
+    delivery_settings = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = Product
@@ -65,6 +74,9 @@ class ProductSerializer(serializers.ModelSerializer):
             'stock', 'stock_label',
             'condition', 'image', 'images', 'product_type', 'is_available', 'status',
             'is_resubmitted', 'rejection_reason', 'flag_reason',
+            'override_delivery_settings', 'delivery_methods', 'delivery_coverage',
+            'delivery_fee_type', 'base_delivery_fee', 'collection_location',
+            'preparation_time', 'delivery_instructions', 'delivery_settings',
             'category', 'category_id', 'category_name',
             'university_id', 'university_name', 'university_short_name', 'seller_details',
             'average_rating', 'created_at', 'updated_at'
@@ -79,6 +91,9 @@ class ProductSerializer(serializers.ModelSerializer):
 
     def get_stock_label(self, obj):
         return format_stock_label(obj.stock)
+
+    def get_delivery_settings(self, obj):
+        return obj.get_effective_delivery_settings()
 
     def get_seller_details(self, obj):
         seller = obj.seller
